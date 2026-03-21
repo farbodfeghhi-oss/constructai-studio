@@ -49,9 +49,12 @@ serve(async (req) => {
   }
 
   try {
-    const { image, prompt, provider = "perplexity" } = await req.json();
+    // Support both old single `image` and new `images[]` format
+    const body = await req.json();
+    const { prompt, provider = "perplexity" } = body;
+    const imageList: string[] = body.images || (body.image ? [body.image] : []);
 
-    if (!image) {
+    if (imageList.length === 0) {
       return new Response(JSON.stringify({ error: "Kein Bild übermittelt" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -62,16 +65,20 @@ serve(async (req) => {
     const apiKey = Deno.env.get(cfg.keyEnv);
     if (!apiKey) throw new Error(`${cfg.keyEnv} is not configured`);
 
-    const userContent: any[] = [
-      {
+    const userContent: any[] = [];
+
+    // Add all images
+    for (const img of imageList) {
+      userContent.push({
         type: "image_url",
-        image_url: { url: image.startsWith("data:") ? image : `data:image/jpeg;base64,${image}` },
-      },
-      {
-        type: "text",
-        text: prompt || "Analysiere dieses technische Bild. Erkenne alle Komponenten, Materialien, Normen und potenzielle Probleme.",
-      },
-    ];
+        image_url: { url: img.startsWith("data:") ? img : `data:image/jpeg;base64,${img}` },
+      });
+    }
+
+    userContent.push({
+      type: "text",
+      text: prompt || `Analysiere ${imageList.length > 1 ? "diese technischen Bilder" : "dieses technische Bild"}. Erkenne alle Komponenten, Materialien, Normen und potenzielle Probleme.`,
+    });
 
     const response = await fetch(cfg.url, {
       method: "POST",

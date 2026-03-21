@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Sparkles, Copy, Check, Save, Trash2, BookTemplate, Loader2 } from "lucide-react";
 import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
+import { RichMediaInput } from "@/components/RichMediaInput";
+import { type Attachment } from "@/components/AttachmentPreview";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -17,24 +19,9 @@ interface Template {
 }
 
 const EXAMPLE_TEMPLATES: Template[] = [
-  {
-    id: "t1",
-    name: "Montagewinkel",
-    beschreibung: "Montagewinkel aus Stahl mit M8 Schrauben, isometrische Ansicht",
-    prompt: "Photorealistic CAD rendering of a steel S235 mounting bracket 100x100x5mm with 4x M8 hex bolts DIN 933 A2-70, isometric view at 30° angle, studio lighting with soft shadows, brushed metal surface, white gradient background, 8K ultra-detailed, sharp focus, engineering visualization",
-  },
-  {
-    id: "t2",
-    name: "Kugellagerbaugruppe",
-    beschreibung: "Explosionszeichnung eines Kugellagers mit allen Einzelteilen",
-    prompt: "Technical exploded view rendering of a deep groove ball bearing 6205-2RS, showing inner ring, outer ring, balls, cage, and rubber seals separated along central axis, precise engineering CAD style, neutral gray background, dimension lines visible, photorealistic metal textures, 8K sharp focus",
-  },
-  {
-    id: "t3",
-    name: "Blechgehäuse",
-    beschreibung: "Schaltschrankgehäuse aus Edelstahl mit Lüftungsschlitzen",
-    prompt: "Photorealistic 3D rendering of a stainless steel V2A electrical enclosure 600x400x200mm with ventilation louvers on side panels, DIN rail mounted inside, IP55 rated, isometric front-open view showing interior layout, industrial studio lighting, white background, 8K ultra-detailed engineering visualization",
-  },
+  { id: "t1", name: "Montagewinkel", beschreibung: "Montagewinkel aus Stahl mit M8 Schrauben, isometrische Ansicht", prompt: "Photorealistic CAD rendering of a steel S235 mounting bracket 100x100x5mm with 4x M8 hex bolts DIN 933 A2-70, isometric view at 30° angle, studio lighting with soft shadows, brushed metal surface, white gradient background, 8K ultra-detailed, sharp focus, engineering visualization" },
+  { id: "t2", name: "Kugellagerbaugruppe", beschreibung: "Explosionszeichnung eines Kugellagers mit allen Einzelteilen", prompt: "Technical exploded view rendering of a deep groove ball bearing 6205-2RS, showing inner ring, outer ring, balls, cage, and rubber seals separated along central axis, precise engineering CAD style, neutral gray background, dimension lines visible, photorealistic metal textures, 8K sharp focus" },
+  { id: "t3", name: "Blechgehäuse", beschreibung: "Schaltschrankgehäuse aus Edelstahl mit Lüftungsschlitzen", prompt: "Photorealistic 3D rendering of a stainless steel V2A electrical enclosure 600x400x200mm with ventilation louvers on side panels, DIN rail mounted inside, IP55 rated, isometric front-open view showing interior layout, industrial studio lighting, white background, 8K ultra-detailed engineering visualization" },
 ];
 
 export default function Prompts() {
@@ -45,6 +32,7 @@ export default function Prompts() {
   const [templates, setTemplates] = useState<Template[]>(EXAMPLE_TEMPLATES);
   const [templateName, setTemplateName] = useState("");
   const [showSave, setShowSave] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const { toast } = useToast();
   const [provider, setProvider] = useState<AIProvider>("perplexity");
 
@@ -56,8 +44,9 @@ export default function Prompts() {
     setIsLoading(true);
     setGeneratedPrompt("");
     try {
+      const images = attachments.filter((a) => a.type === "image").map((a) => a.dataUrl);
       const { data, error } = await supabase.functions.invoke("generate-prompt", {
-        body: { beschreibung, provider },
+        body: { beschreibung, provider, images },
       });
       if (error) throw error;
       if (data?.error) {
@@ -82,42 +71,25 @@ export default function Prompts() {
 
   const saveTemplate = () => {
     if (!templateName.trim() || !generatedPrompt) return;
-    const newTemplate: Template = {
-      id: `custom-${Date.now()}`,
-      name: templateName,
-      beschreibung,
-      prompt: generatedPrompt,
-    };
-    setTemplates((prev) => [newTemplate, ...prev]);
+    setTemplates((prev) => [{ id: `custom-${Date.now()}`, name: templateName, beschreibung, prompt: generatedPrompt }, ...prev]);
     setTemplateName("");
     setShowSave(false);
     toast({ title: "Gespeichert", description: `Vorlage "${templateName}" wurde gespeichert.` });
   };
 
-  const loadTemplate = (t: Template) => {
-    setBeschreibung(t.beschreibung);
-    setGeneratedPrompt(t.prompt);
-    setShowSave(false);
-  };
-
-  const deleteTemplate = (id: string) => {
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
-    toast({ title: "Gelöscht", description: "Vorlage entfernt." });
-  };
+  const loadTemplate = (t: Template) => { setBeschreibung(t.beschreibung); setGeneratedPrompt(t.prompt); setShowSave(false); };
+  const deleteTemplate = (id: string) => { setTemplates((prev) => prev.filter((t) => t.id !== id)); toast({ title: "Gelöscht", description: "Vorlage entfernt." }); };
 
   return (
     <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">AI-Prompt Generator</h1>
-          <p className="text-muted-foreground">
-            Erstellen Sie professionelle Prompts für technische Bild-KIs und CAD-Rendering.
-          </p>
+          <p className="text-muted-foreground">Erstellen Sie professionelle Prompts für technische Bild-KIs und CAD-Rendering.</p>
         </div>
         <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
       </div>
 
-      {/* Input */}
       <Card>
         <CardContent className="p-6 space-y-4">
           <Textarea
@@ -126,6 +98,12 @@ export default function Prompts() {
             value={beschreibung}
             onChange={(e) => setBeschreibung(e.target.value)}
           />
+          <RichMediaInput
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            acceptFiles={false}
+            acceptAudio={false}
+          />
           <Button onClick={generatePrompt} disabled={isLoading} className="gap-2">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {isLoading ? "Wird generiert…" : "Prompt generieren"}
@@ -133,7 +111,6 @@ export default function Prompts() {
         </CardContent>
       </Card>
 
-      {/* Generated Prompt */}
       <Card className="bg-muted/50">
         <CardContent className="p-6">
           <div className="flex justify-between items-start mb-3">
@@ -148,16 +125,9 @@ export default function Prompts() {
           <p className="text-sm text-muted-foreground font-mono leading-relaxed whitespace-pre-wrap">
             {generatedPrompt || "Starten Sie die Generierung, um einen optimierten Prompt zu erhalten…"}
           </p>
-
-          {/* Save as template */}
           {showSave && generatedPrompt && (
             <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-              <Input
-                placeholder="Vorlagenname…"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                className="max-w-xs"
-              />
+              <Input placeholder="Vorlagenname…" value={templateName} onChange={(e) => setTemplateName(e.target.value)} className="max-w-xs" />
               <Button variant="secondary" size="sm" className="gap-1" onClick={saveTemplate} disabled={!templateName.trim()}>
                 <Save className="h-3 w-3" /> Speichern
               </Button>
@@ -166,37 +136,24 @@ export default function Prompts() {
         </CardContent>
       </Card>
 
-      {/* Template Library */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <BookTemplate className="h-5 w-5" /> Vorlagen-Bibliothek
-          </CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2"><BookTemplate className="h-5 w-5" /> Vorlagen-Bibliothek</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {templates.length === 0 ? (
             <p className="text-sm text-muted-foreground">Noch keine Vorlagen gespeichert.</p>
           ) : (
             templates.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors"
-              >
+              <div key={t.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
                 <button className="flex-1 text-left" onClick={() => loadTemplate(t)}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-sm">{t.name}</span>
-                    {t.id.startsWith("custom-") && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Eigene</Badge>
-                    )}
+                    {t.id.startsWith("custom-") && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Eigene</Badge>}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-1">{t.beschreibung}</p>
                 </button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => deleteTemplate(t.id)}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => deleteTemplate(t.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>

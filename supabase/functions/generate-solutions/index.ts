@@ -68,7 +68,7 @@ serve(async (req) => {
   }
 
   try {
-    const { projektName, anforderungen, provider = "perplexity" } = await req.json();
+    const { projektName, anforderungen, provider = "perplexity", images = [] } = await req.json();
 
     if (!anforderungen?.trim()) {
       return new Response(JSON.stringify({ error: "Bitte geben Sie eine Projektbeschreibung ein." }), {
@@ -85,6 +85,18 @@ serve(async (req) => {
       ? `Projekt: "${projektName}"\n\nAnforderungen:\n${anforderungen}`
       : anforderungen;
 
+    // Build user content with optional images
+    const userContent: any[] = [];
+    if (images && images.length > 0) {
+      for (const img of images) {
+        userContent.push({
+          type: "image_url",
+          image_url: { url: img.startsWith("data:") ? img : `data:image/jpeg;base64,${img}` },
+        });
+      }
+    }
+    userContent.push({ type: "text", text: userPrompt });
+
     const response = await fetch(cfg.url, {
       method: "POST",
       headers: {
@@ -95,7 +107,7 @@ serve(async (req) => {
         model: cfg.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
+          { role: "user", content: images.length > 0 ? userContent : userPrompt },
         ],
       }),
     });

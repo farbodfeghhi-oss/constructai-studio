@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { beschreibung, provider = "perplexity" } = await req.json();
+    const { beschreibung, provider = "perplexity", images = [] } = await req.json();
 
     if (!beschreibung?.trim()) {
       return new Response(JSON.stringify({ error: "Bitte geben Sie eine Beschreibung ein." }), {
@@ -55,6 +55,19 @@ serve(async (req) => {
     const apiKey = Deno.env.get(cfg.keyEnv);
     if (!apiKey) throw new Error(`${cfg.keyEnv} is not configured`);
 
+    // Build user content with optional reference images
+    const userText = `Erstelle einen professionellen Bild-KI Prompt für: ${beschreibung}`;
+    const userContent: any[] = [];
+    if (images && images.length > 0) {
+      for (const img of images) {
+        userContent.push({
+          type: "image_url",
+          image_url: { url: img.startsWith("data:") ? img : `data:image/jpeg;base64,${img}` },
+        });
+      }
+      userContent.push({ type: "text", text: `${userText}\n\nNutze die angehängten Referenzbilder als visuelle Inspiration.` });
+    }
+
     const response = await fetch(cfg.url, {
       method: "POST",
       headers: {
@@ -65,7 +78,7 @@ serve(async (req) => {
         model: cfg.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Erstelle einen professionellen Bild-KI Prompt für: ${beschreibung}` },
+          { role: "user", content: images.length > 0 ? userContent : userText },
         ],
       }),
     });

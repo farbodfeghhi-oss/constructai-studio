@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
+import { RichMediaInput } from "@/components/RichMediaInput";
+import { type Attachment } from "@/components/AttachmentPreview";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -31,6 +33,7 @@ export default function PDFTranslate() {
   const [provider, setProvider] = useState<AIProvider>("monica");
   const [copied, setCopied] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (file.type !== "application/pdf") {
@@ -47,57 +50,38 @@ export default function PDFTranslate() {
     setTranslation("");
 
     try {
-      // Extract text from PDF using pdf.js-like approach in browser
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // Simple text extraction from PDF binary
+      const uint8Array = new Uint8Array(await file.arrayBuffer());
       const text = extractTextFromPDF(uint8Array);
-      
       if (!text.trim()) {
         toast({ title: "Warnung", description: "Kein Text im PDF gefunden. Das PDF könnte gescannt sein.", variant: "destructive" });
       }
-      
       setExtractedText(text);
       toast({ title: "PDF geladen", description: `${file.name} — Text erfolgreich extrahiert.` });
-    } catch (err: any) {
+    } catch {
       toast({ title: "Fehler", description: "PDF konnte nicht gelesen werden.", variant: "destructive" });
     } finally {
       setIsExtracting(false);
     }
   }, []);
 
-  // Basic PDF text extraction (handles simple text PDFs)
   const extractTextFromPDF = (data: Uint8Array): string => {
     const text = new TextDecoder("latin1").decode(data);
     const textBlocks: string[] = [];
-    
-    // Extract text between BT and ET markers (PDF text objects)
     const btEtRegex = /BT\s([\s\S]*?)ET/g;
     let match;
-    
     while ((match = btEtRegex.exec(text)) !== null) {
       const block = match[1];
-      // Extract text from Tj and TJ operators
       const tjRegex = /\(([^)]*)\)\s*Tj/g;
       let tjMatch;
-      while ((tjMatch = tjRegex.exec(block)) !== null) {
-        textBlocks.push(tjMatch[1]);
-      }
-      
-      // TJ array operator
+      while ((tjMatch = tjRegex.exec(block)) !== null) textBlocks.push(tjMatch[1]);
       const tjArrayRegex = /\[([^\]]*)\]\s*TJ/g;
       let tjArrMatch;
       while ((tjArrMatch = tjArrayRegex.exec(block)) !== null) {
-        const items = tjArrMatch[1];
         const strRegex = /\(([^)]*)\)/g;
         let strMatch;
-        while ((strMatch = strRegex.exec(items)) !== null) {
-          textBlocks.push(strMatch[1]);
-        }
+        while ((strMatch = strRegex.exec(tjArrMatch[1])) !== null) textBlocks.push(strMatch[1]);
       }
     }
-    
     return textBlocks.join(" ").replace(/\\n/g, "\n").replace(/\s+/g, " ").trim();
   };
 
@@ -112,18 +96,14 @@ export default function PDFTranslate() {
       toast({ title: "Fehler", description: "Kein Text zum Übersetzen vorhanden.", variant: "destructive" });
       return;
     }
-
     setIsLoading(true);
     setTranslation("");
-
     try {
       const { data, error } = await supabase.functions.invoke("translate-pdf", {
         body: { text: extractedText, sourceLang, targetLang, provider },
       });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-
       setTranslation(data.translation);
       toast({ title: "Übersetzung abgeschlossen", description: `${data.chunks || 1} Abschnitt(e) übersetzt.` });
     } catch (err: any) {
@@ -154,12 +134,9 @@ export default function PDFTranslate() {
     <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">PDF-Übersetzer</h1>
-        <p className="text-muted-foreground mt-1">
-          Technische PDF-Dokumente KI-gestützt übersetzen mit Monica AI oder Perplexity.
-        </p>
+        <p className="text-muted-foreground mt-1">Technische PDF-Dokumente KI-gestützt übersetzen mit Monica AI oder Perplexity.</p>
       </div>
 
-      {/* Settings Bar */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3 items-center">
@@ -170,27 +147,15 @@ export default function PDFTranslate() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Von:</span>
               <Select value={sourceLang} onValueChange={setSourceLang}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LANGUAGES.map((l) => (
-                    <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                <SelectContent>{LANGUAGES.map((l) => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}</SelectContent>
               </Select>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Nach:</span>
               <Select value={targetLang} onValueChange={setTargetLang}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LANGUAGES.map((l) => (
-                    <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                <SelectContent>{LANGUAGES.map((l) => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}</SelectContent>
               </Select>
             </div>
           </div>
@@ -213,9 +178,7 @@ export default function PDFTranslate() {
           ) : (
             <>
               <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                PDF hierher ziehen oder <span className="text-primary font-medium">klicken zum Hochladen</span>
-              </p>
+              <p className="text-muted-foreground">PDF hierher ziehen oder <span className="text-primary font-medium">klicken zum Hochladen</span></p>
               <p className="text-xs text-muted-foreground/60 mt-1">PDF — max. 20 MB</p>
               {fileName && <p className="text-sm font-medium mt-2 text-primary">{fileName}</p>}
             </>
@@ -227,25 +190,27 @@ export default function PDFTranslate() {
         </CardContent>
       </Card>
 
-      {/* Extracted Text & Manual Input */}
+      {/* Additional attachments */}
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground mb-2">Zusätzliche Anhänge (Screenshots, Sprachnotizen)</p>
+          <RichMediaInput
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            acceptFiles={false}
+            acceptImages={true}
+            acceptAudio={true}
+            acceptScreenshot={true}
+          />
+        </CardContent>
+      </Card>
+
       {(extractedText || !fileName) && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Quelltext</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Quelltext</CardTitle></CardHeader>
           <CardContent>
-            <Textarea
-              placeholder="Text aus PDF wird hier angezeigt, oder fügen Sie Text manuell ein…"
-              rows={8}
-              value={extractedText}
-              onChange={(e) => setExtractedText(e.target.value)}
-              className="font-mono text-sm"
-            />
-            <Button
-              onClick={translate}
-              disabled={isLoading || !extractedText.trim()}
-              className="mt-4 gap-2"
-            >
+            <Textarea placeholder="Text aus PDF wird hier angezeigt, oder fügen Sie Text manuell ein…" rows={8} value={extractedText} onChange={(e) => setExtractedText(e.target.value)} className="font-mono text-sm" />
+            <Button onClick={translate} disabled={isLoading || !extractedText.trim()} className="mt-4 gap-2">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
               {isLoading ? "Übersetze…" : "Übersetzen"}
             </Button>
@@ -253,32 +218,24 @@ export default function PDFTranslate() {
         </Card>
       )}
 
-      {/* Loading */}
       {isLoading && (
         <Card className="border-primary/20">
           <CardContent className="p-8 text-center">
             <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
             <p className="font-medium">KI übersetzt den Text…</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {provider === "monica" ? "Monica AI" : "Perplexity"} arbeitet
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">{provider === "monica" ? "Monica AI" : "Perplexity"} arbeitet</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Translation Result */}
       {translation && (
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Languages className="h-4 w-4 text-primary" />
-                Übersetzung ({targetLang})
-              </CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Languages className="h-4 w-4 text-primary" /> Übersetzung ({targetLang})</CardTitle>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={copyTranslation}>
-                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  {copied ? "Kopiert" : "Kopieren"}
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />} {copied ? "Kopiert" : "Kopieren"}
                 </Button>
                 <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={downloadTranslation}>
                   <Download className="h-3 w-3" /> Herunterladen
@@ -287,9 +244,7 @@ export default function PDFTranslate() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-sm whitespace-pre-wrap font-mono leading-relaxed bg-muted/50 p-4 rounded-md">
-              {translation}
-            </div>
+            <div className="text-sm whitespace-pre-wrap font-mono leading-relaxed bg-muted/50 p-4 rounded-md">{translation}</div>
           </CardContent>
         </Card>
       )}
