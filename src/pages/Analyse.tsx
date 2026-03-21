@@ -102,7 +102,6 @@ export default function Analyse() {
         </div>
         <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
       </div>
-      </div>
 
       {/* Upload Zone */}
       {!imagePreview ? (

@@ -116,7 +116,6 @@ export default function Prompts() {
         </div>
         <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
       </div>
-      </div>
 
       {/* Input */}
       <Card>
