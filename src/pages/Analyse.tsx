@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { Upload, Loader2, AlertTriangle, CheckCircle, Info, ArrowRight, Wrench, RefreshCw } from "lucide-react";
 import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
+import { RichMediaInput } from "@/components/RichMediaInput";
+import { type Attachment } from "@/components/AttachmentPreview";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,50 +32,23 @@ const severityClass: Record<string, string> = {
 };
 
 export default function Analyse() {
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [provider, setProvider] = useState<AIProvider>("perplexity");
 
-  const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Nur Bilder erlaubt", description: "Bitte laden Sie eine JPG oder PNG Datei hoch.", variant: "destructive" });
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "Datei zu groß", description: "Maximale Dateigröße: 10 MB", variant: "destructive" });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
-      setResult(null);
-    };
-    reader.readAsDataURL(file);
-  }, []);
-
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
-
-  const onFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+  const hasImages = attachments.some((a) => a.type === "image");
 
   const analyzeImage = async () => {
-    if (!imagePreview) return;
+    const images = attachments.filter((a) => a.type === "image").map((a) => a.dataUrl);
+    if (images.length === 0) return;
+
     setIsAnalyzing(true);
     setResult(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("analyze-image", {
-        body: { image: imagePreview, provider },
+        body: { images, provider },
       });
 
       if (error) throw error;
@@ -89,7 +64,7 @@ export default function Analyse() {
   };
 
   const reset = () => {
-    setImagePreview(null);
+    setAttachments([]);
     setResult(null);
   };
 
@@ -104,51 +79,35 @@ export default function Analyse() {
       </div>
 
       {/* Upload Zone */}
-      {!imagePreview ? (
-        <Card
-          className={`border-2 border-dashed transition-colors cursor-pointer ${
-            dragOver ? "border-primary bg-primary/5" : "border-primary/30 hover:border-primary/50"
-          }`}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-          onClick={() => document.getElementById("file-input")?.click()}
-        >
-          <CardContent className="p-12 text-center">
-            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">
-              Bild hierher ziehen oder <span className="text-primary font-medium">klicken zum Hochladen</span>
-            </p>
-            <p className="text-xs text-muted-foreground/60 mt-2">JPG, PNG — max. 10 MB</p>
-            <input id="file-input" type="file" accept="image/*" className="hidden" onChange={onFileSelect} />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-start">
-              <img
-                src={imagePreview}
-                alt="Hochgeladenes Bild"
-                className="w-full sm:w-48 h-48 object-contain rounded-lg border bg-muted"
-              />
-              <div className="flex-1 space-y-3">
-                <p className="text-sm font-medium">Bild bereit zur Analyse</p>
-                <p className="text-xs text-muted-foreground">Klicken Sie auf „Analysieren", um die KI-Erkennung zu starten.</p>
-                <div className="flex gap-2">
-                  <Button onClick={analyzeImage} disabled={isAnalyzing} className="gap-2 bg-primary hover:bg-primary/90">
-                    {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
-                    {isAnalyzing ? "Analysiere…" : "Analysieren"}
-                  </Button>
-                  <Button variant="outline" onClick={reset} disabled={isAnalyzing}>
-                    <RefreshCw className="h-4 w-4 mr-2" /> Neues Bild
-                  </Button>
-                </div>
-              </div>
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <RichMediaInput
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            acceptFiles={true}
+            acceptAudio={true}
+            acceptScreenshot={true}
+          />
+
+          {hasImages && (
+            <div className="flex gap-2">
+              <Button onClick={analyzeImage} disabled={isAnalyzing} className="gap-2 bg-primary hover:bg-primary/90">
+                {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+                {isAnalyzing ? "Analysiere…" : `${attachments.filter((a) => a.type === "image").length} Bild(er) analysieren`}
+              </Button>
+              <Button variant="outline" onClick={reset} disabled={isAnalyzing}>
+                <RefreshCw className="h-4 w-4 mr-2" /> Zurücksetzen
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {!hasImages && attachments.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Laden Sie Bilder hoch, nehmen Sie ein Foto auf oder machen Sie einen Screenshot zur Analyse.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Loading */}
       {isAnalyzing && (
@@ -164,7 +123,6 @@ export default function Analyse() {
       {/* Results */}
       {result && !result.rawResponse && (
         <div className="space-y-4">
-          {/* Erkannte Teile */}
           {result.erkannteTeile?.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
@@ -198,7 +156,6 @@ export default function Analyse() {
             </Card>
           )}
 
-          {/* Technische Analyse */}
           {result.technischeAnalyse && (
             <Card>
               <CardHeader className="pb-3">
@@ -223,7 +180,6 @@ export default function Analyse() {
             </Card>
           )}
 
-          {/* Probleme */}
           {result.probleme?.length > 0 && (
             <Card className="border-accent/30">
               <CardHeader className="pb-3">
@@ -249,7 +205,6 @@ export default function Analyse() {
             </Card>
           )}
 
-          {/* Alternativen */}
           {result.alternativen?.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
@@ -269,7 +224,6 @@ export default function Analyse() {
             </Card>
           )}
 
-          {/* Nächste Schritte */}
           {result.naechsteSchritte?.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
@@ -292,7 +246,6 @@ export default function Analyse() {
         </div>
       )}
 
-      {/* Raw response fallback */}
       {result?.rawResponse && (
         <Card>
           <CardHeader className="pb-3">
