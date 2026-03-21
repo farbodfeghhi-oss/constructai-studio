@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Loader2, Trophy, Coins, Zap, ChevronDown, Wrench } from "lucide-react";
+import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -150,6 +151,7 @@ export default function Loesung() {
   const [isLoading, setIsLoading] = useState(false);
   const [loesungen, setLoesungen] = useState<Loesung[]>([]);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
+  const [provider, setProvider] = useState<AIProvider>("perplexity");
 
   const generate = async () => {
     if (!anforderungen.trim()) {
@@ -162,7 +164,7 @@ export default function Loesung() {
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-solutions", {
-        body: { projektName, anforderungen },
+        body: { projektName, anforderungen, provider },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -190,11 +192,16 @@ export default function Loesung() {
       {/* Input Form */}
       <Card>
         <CardContent className="p-6 space-y-4">
-          <Input
-            placeholder="Projektname (optional)"
-            value={projektName}
-            onChange={(e) => setProjektName(e.target.value)}
-          />
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <Input
+                placeholder="Projektname (optional)"
+                value={projektName}
+                onChange={(e) => setProjektName(e.target.value)}
+              />
+            </div>
+            <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
+          </div>
           <Textarea
             placeholder="Beschreiben Sie Ihre Anforderungen: Funktion, Belastung, Material, Abmessungen, Einsatzbereich…"
             rows={5}
