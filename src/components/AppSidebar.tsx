@@ -1,4 +1,4 @@
-import { Home, Camera, Search, Settings, Sparkles, FileText, Plus } from "lucide-react";
+import { Home, Camera, Search, Settings, Sparkles, FileText, Plus, Languages } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -21,6 +21,7 @@ const navItems = [
   { title: "Komponenten-Suche", url: "/komponenten", icon: Search },
   { title: "Lösungsvorschläge", url: "/loesung", icon: Settings },
   { title: "AI-Prompts", url: "/prompts", icon: Sparkles },
+  { title: "PDF-Übersetzer", url: "/pdf-translate", icon: Languages },
   { title: "Dokumentation", url: "/dokumentation", icon: FileText },
 ];
 
