@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      components: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          file_urls: string[] | null
+          id: string
+          image_urls: string[] | null
+          keywords: string[] | null
+          material: string | null
+          name: string
+          norm: string | null
+          price: string | null
+          size: string | null
+          source: string | null
+          supplier: string | null
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          file_urls?: string[] | null
+          id?: string
+          image_urls?: string[] | null
+          keywords?: string[] | null
+          material?: string | null
+          name: string
+          norm?: string | null
+          price?: string | null
+          size?: string | null
+          source?: string | null
+          supplier?: string | null
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          file_urls?: string[] | null
+          id?: string
+          image_urls?: string[] | null
+          keywords?: string[] | null
+          material?: string | null
+          name?: string
+          norm?: string | null
+          price?: string | null
+          size?: string | null
+          source?: string | null
+          supplier?: string | null
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
