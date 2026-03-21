@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Sparkles, Copy, Check, Save, Trash2, BookTemplate, Loader2 } from "lucide-react";
+import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ export default function Prompts() {
   const [templateName, setTemplateName] = useState("");
   const [showSave, setShowSave] = useState(false);
   const { toast } = useToast();
+  const [provider, setProvider] = useState<AIProvider>("perplexity");
 
   const generatePrompt = async () => {
     if (!beschreibung.trim()) {
@@ -55,7 +57,7 @@ export default function Prompts() {
     setGeneratedPrompt("");
     try {
       const { data, error } = await supabase.functions.invoke("generate-prompt", {
-        body: { beschreibung },
+        body: { beschreibung, provider },
       });
       if (error) throw error;
       if (data?.error) {
@@ -105,11 +107,14 @@ export default function Prompts() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">AI-Prompt Generator</h1>
-        <p className="text-muted-foreground">
-          Erstellen Sie professionelle Prompts für technische Bild-KIs und CAD-Rendering.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">AI-Prompt Generator</h1>
+          <p className="text-muted-foreground">
+            Erstellen Sie professionelle Prompts für technische Bild-KIs und CAD-Rendering.
+          </p>
+        </div>
+        <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
       </div>
 
       {/* Input */}

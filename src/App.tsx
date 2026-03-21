@@ -12,6 +12,7 @@ import Komponenten from "./pages/Komponenten";
 import Loesung from "./pages/Loesung";
 import Prompts from "./pages/Prompts";
 import Dokumentation from "./pages/Dokumentation";
+import PDFTranslate from "./pages/PDFTranslate";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -60,6 +61,7 @@ const App = () => (
                         <Route path="/komponenten" element={<Komponenten />} />
                         <Route path="/loesung" element={<Loesung />} />
                         <Route path="/prompts" element={<Prompts />} />
+                        <Route path="/pdf-translate" element={<PDFTranslate />} />
                         <Route path="/dokumentation" element={<Dokumentation />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>

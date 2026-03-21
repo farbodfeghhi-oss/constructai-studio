@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Upload, Loader2, AlertTriangle, CheckCircle, Info, ArrowRight, Wrench, RefreshCw } from "lucide-react";
+import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ export default function Analyse() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [provider, setProvider] = useState<AIProvider>("perplexity");
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -71,7 +73,7 @@ export default function Analyse() {
 
     try {
       const { data, error } = await supabase.functions.invoke("analyze-image", {
-        body: { image: imagePreview },
+        body: { image: imagePreview, provider },
       });
 
       if (error) throw error;
@@ -93,9 +95,12 @@ export default function Analyse() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Bild-Analyse</h1>
-        <p className="text-muted-foreground mt-1">KI-gestützte Erkennung technischer Komponenten aus Bildern und Skizzen.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Bild-Analyse</h1>
+          <p className="text-muted-foreground mt-1">KI-gestützte Erkennung technischer Komponenten aus Bildern und Skizzen.</p>
+        </div>
+        <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
       </div>
 
       {/* Upload Zone */}

@@ -49,13 +49,26 @@ Erstelle für die gegebene Projektbeschreibung genau 3 Lösungsvarianten. Antwor
 
 Gib realistische DIN/ISO Normen, Materialien, Preise und praxisnahe Empfehlungen.`;
 
+const PROVIDERS = {
+  perplexity: {
+    url: "https://api.perplexity.ai/chat/completions",
+    keyEnv: "PERPLEXITY_API_KEY",
+    model: "sonar-pro",
+  },
+  monica: {
+    url: "https://openapi.monica.im/v1/chat/completions",
+    keyEnv: "MONICA_API_KEY",
+    model: "gpt-4o",
+  },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { projektName, anforderungen } = await req.json();
+    const { projektName, anforderungen, provider = "perplexity" } = await req.json();
 
     if (!anforderungen?.trim()) {
       return new Response(JSON.stringify({ error: "Bitte geben Sie eine Projektbeschreibung ein." }), {
@@ -64,21 +77,22 @@ serve(async (req) => {
       });
     }
 
-    const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
-    if (!PERPLEXITY_API_KEY) throw new Error("PERPLEXITY_API_KEY is not configured");
+    const cfg = PROVIDERS[provider as keyof typeof PROVIDERS] || PROVIDERS.perplexity;
+    const apiKey = Deno.env.get(cfg.keyEnv);
+    if (!apiKey) throw new Error(`${cfg.keyEnv} is not configured`);
 
     const userPrompt = projektName
       ? `Projekt: "${projektName}"\n\nAnforderungen:\n${anforderungen}`
       : anforderungen;
 
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    const response = await fetch(cfg.url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "sonar-pro",
+        model: cfg.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
@@ -98,7 +112,7 @@ serve(async (req) => {
         });
       }
       const text = await response.text();
-      console.error("Perplexity API error:", response.status, text);
+      console.error(`${provider} API error:`, response.status, text);
       return new Response(JSON.stringify({ error: "KI-Generierung fehlgeschlagen" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

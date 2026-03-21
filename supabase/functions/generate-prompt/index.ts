@@ -23,13 +23,26 @@ Regeln für den Prompt:
 Beispiel-Output:
 "Photorealistic CAD rendering of a stainless steel A2-70 hex bolt DIN 933 M12x60, isometric view at 30° angle, studio lighting with soft shadows, brushed metal surface texture with visible thread detail, white gradient background, technical precision, 8K ultra-detailed, sharp focus, engineering visualization style"`;
 
+const PROVIDERS = {
+  perplexity: {
+    url: "https://api.perplexity.ai/chat/completions",
+    keyEnv: "PERPLEXITY_API_KEY",
+    model: "sonar-pro",
+  },
+  monica: {
+    url: "https://openapi.monica.im/v1/chat/completions",
+    keyEnv: "MONICA_API_KEY",
+    model: "gpt-4o",
+  },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { beschreibung } = await req.json();
+    const { beschreibung, provider = "perplexity" } = await req.json();
 
     if (!beschreibung?.trim()) {
       return new Response(JSON.stringify({ error: "Bitte geben Sie eine Beschreibung ein." }), {
@@ -38,17 +51,18 @@ serve(async (req) => {
       });
     }
 
-    const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
-    if (!PERPLEXITY_API_KEY) throw new Error("PERPLEXITY_API_KEY is not configured");
+    const cfg = PROVIDERS[provider as keyof typeof PROVIDERS] || PROVIDERS.perplexity;
+    const apiKey = Deno.env.get(cfg.keyEnv);
+    if (!apiKey) throw new Error(`${cfg.keyEnv} is not configured`);
 
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    const response = await fetch(cfg.url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "sonar-pro",
+        model: cfg.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: `Erstelle einen professionellen Bild-KI Prompt für: ${beschreibung}` },
@@ -68,7 +82,7 @@ serve(async (req) => {
         });
       }
       const text = await response.text();
-      console.error("Perplexity API error:", response.status, text);
+      console.error(`${provider} API error:`, response.status, text);
       return new Response(JSON.stringify({ error: "KI-Generierung fehlgeschlagen" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
