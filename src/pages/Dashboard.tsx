@@ -163,17 +163,30 @@ export default function Dashboard() {
       toast({ title: "Titel und Kategorie erforderlich", variant: "destructive" });
       return;
     }
+    if ((addType === "pdf" || addType === "image") && !addFile) {
+      toast({ title: "Bitte eine Datei auswählen", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Nicht angemeldet");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast({ title: "Bitte zuerst anmelden", description: "Sie müssen eingeloggt sein, um Wissen zu speichern.", variant: "destructive" });
+        setSaving(false);
+        return;
+      }
+      const user = session.user;
 
       let fileUrl: string | null = null;
       if (addFile && (addType === "pdf" || addType === "image")) {
         const ext = addFile.name.split(".").pop();
-        const path = `knowledge/${user.id}/${Date.now()}.${ext}`;
+        const path = `${user.id}/knowledge/${Date.now()}.${ext}`;
         const { error: uploadError } = await supabase.storage.from("component-files").upload(path, addFile);
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          toast({ title: "Datei konnte nicht hochgeladen werden", description: uploadError.message, variant: "destructive" });
+          setSaving(false);
+          return;
+        }
         const { data: urlData } = supabase.storage.from("component-files").getPublicUrl(path);
         fileUrl = urlData.publicUrl;
       }
@@ -190,7 +203,11 @@ export default function Dashboard() {
         ai_summary: aiSuggestion?.summary || null,
         keywords: aiSuggestion?.keywords || [],
       });
-      if (error) throw error;
+      if (error) {
+        toast({ title: "Eintrag konnte nicht gespeichert werden", description: error.message, variant: "destructive" });
+        setSaving(false);
+        return;
+      }
 
       toast({ title: "Wissen gespeichert!" });
       setShowAddDialog(false);
