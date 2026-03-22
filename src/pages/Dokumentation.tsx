@@ -533,6 +533,15 @@ export default function Dokumentation() {
             </div>
             <div className="flex gap-2">
               <ProviderSelect value={aiProvider} onChange={setAiProvider} className="w-[150px]" />
+              <Button variant="secondary" className="gap-1.5" onClick={() => document.getElementById("pdf-catalog-input")?.click()} disabled={pdfImporting}>
+                {pdfImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                PDF-Katalog importieren
+              </Button>
+              <input id="pdf-catalog-input" type="file" accept=".pdf" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handlePdfImport(file);
+                e.target.value = "";
+              }} />
               <Button className="gap-1.5" onClick={() => setShowAddForm(!showAddForm)}>
                 {showAddForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                 {showAddForm ? "Schließen" : "Produkt hinzufügen"}
