@@ -15,7 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).href;
 
 const quickActions = [
   { title: "Normteil-Suche", desc: "DIN/ISO Standardteile finden", icon: Search, route: "/komponenten" },
