@@ -101,6 +101,39 @@ export type Database = {
         }
         Relationships: []
       }
+      solutions: {
+        Row: {
+          anforderungen: string
+          created_at: string
+          id: string
+          loesungen: Json
+          projekt_name: string | null
+          provider: string | null
+          raw_response: string | null
+          user_id: string
+        }
+        Insert: {
+          anforderungen: string
+          created_at?: string
+          id?: string
+          loesungen?: Json
+          projekt_name?: string | null
+          provider?: string | null
+          raw_response?: string | null
+          user_id: string
+        }
+        Update: {
+          anforderungen?: string
+          created_at?: string
+          id?: string
+          loesungen?: Json
+          projekt_name?: string | null
+          provider?: string | null
+          raw_response?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

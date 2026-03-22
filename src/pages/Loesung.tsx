@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, ChevronDown } from "lucide-react";
 import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
 import { RichMediaInput } from "@/components/RichMediaInput";
 import { type Attachment } from "@/components/AttachmentPreview";
@@ -23,6 +23,16 @@ interface Loesung {
   nachteile: string[];
   kosten: { material: string; fertigung: string; gesamt: string };
   cadTipps: string[];
+}
+
+interface SavedSolution {
+  id: string;
+  created_at: string;
+  projekt_name: string | null;
+  anforderungen: string;
+  provider: string | null;
+  loesungen: Loesung[];
+  raw_response: string | null;
 }
 
 const tabIcons: Record<string, typeof Trophy> = { best: Trophy, cheap: Coins, performance: Zap };
@@ -106,6 +116,38 @@ function LoesungCard({ loesung }: { loesung: Loesung }) {
   );
 }
 
+function SolutionHistory({ history, onSelect, onDelete }: { 
+  history: SavedSolution[]; 
+  onSelect: (s: SavedSolution) => void;
+  onDelete: (id: string) => void;
+}) {
+  if (history.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-8">Noch keine gespeicherten Lösungen.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {history.map((s) => (
+        <Card key={s.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => onSelect(s)}>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{s.projekt_name || s.anforderungen.slice(0, 60)}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {new Date(s.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                {" · "}{s.loesungen?.length || 0} Varianten
+                {s.provider && ` · ${s.provider}`}
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(s.id); }}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export default function Loesung() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,14 +160,47 @@ export default function Loesung() {
   const [loesungen, setLoesungen] = useState<Loesung[]>([]);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
   const [provider, setProvider] = useState<AIProvider>("monica");
+  const [activeTab, setActiveTab] = useState("new");
+  const [history, setHistory] = useState<SavedSolution[]>([]);
+  const [selectedHistory, setSelectedHistory] = useState<SavedSolution | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("solutions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (data) setHistory(data.map(d => ({ ...d, loesungen: (d.loesungen as any) || [] })));
+  }, []);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  const saveSolution = async (loesungenData: Loesung[], rawResp: string | null) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("solutions").insert({
+      user_id: user.id,
+      projekt_name: projektName || null,
+      anforderungen,
+      provider,
+      loesungen: loesungenData as any,
+      raw_response: rawResp,
+    } as any);
+    loadHistory();
+  };
+
+  const deleteSolution = async (id: string) => {
+    await supabase.from("solutions").delete().eq("id", id);
+    if (selectedHistory?.id === id) setSelectedHistory(null);
+    setHistory(prev => prev.filter(s => s.id !== id));
+    toast({ title: "Gelöscht", description: "Lösung wurde entfernt." });
+  };
 
   const zurueckZumDashboard = () => {
-    navigate("/", {
-      state: {
-        description: anforderungen,
-        attachments,
-      },
-    });
+    navigate("/", { state: { description: anforderungen, attachments } });
   };
 
   const generate = async () => {
@@ -136,6 +211,7 @@ export default function Loesung() {
     setIsLoading(true);
     setLoesungen([]);
     setRawResponse(null);
+    setSelectedHistory(null);
 
     try {
       const images = attachments.filter((a) => a.type === "image").map((a) => a.dataUrl);
@@ -148,8 +224,10 @@ export default function Loesung() {
       if (data?.loesungen) {
         setLoesungen(data.loesungen);
         toast({ title: "Lösungen generiert", description: `${data.loesungen.length} Varianten erstellt.` });
+        await saveSolution(data.loesungen, null);
       } else if (data?.rawResponse) {
         setRawResponse(data.rawResponse);
+        await saveSolution([], data.rawResponse);
       }
     } catch (err: any) {
       toast({ title: "Fehler", description: err.message || "Generierung fehlgeschlagen", variant: "destructive" });
@@ -157,6 +235,14 @@ export default function Loesung() {
       setIsLoading(false);
     }
   };
+
+  const viewHistoryItem = (s: SavedSolution) => {
+    setSelectedHistory(s);
+    setActiveTab("new");
+  };
+
+  const displayLoesungen = selectedHistory ? selectedHistory.loesungen : loesungen;
+  const displayRaw = selectedHistory ? selectedHistory.raw_response : rawResponse;
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -170,63 +256,90 @@ export default function Loesung() {
         <p className="text-muted-foreground mt-1">KI-generierte Konstruktionslösungen mit Varianten und Alternativen.</p>
       </div>
 
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <Input placeholder="Projektname (optional)" value={projektName} onChange={(e) => setProjektName(e.target.value)} />
-            </div>
-            <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
-          </div>
-          <Textarea
-            placeholder="Beschreiben Sie Ihre Anforderungen: Funktion, Belastung, Material, Abmessungen, Einsatzbereich…"
-            rows={5}
-            value={anforderungen}
-            onChange={(e) => setAnforderungen(e.target.value)}
-          />
-          <RichMediaInput attachments={attachments} onAttachmentsChange={setAttachments} />
-          <Button onClick={generate} disabled={isLoading} className="gap-2 bg-primary hover:bg-primary/90">
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-            {isLoading ? "Generiere Lösungen…" : "Lösungen generieren"}
-          </Button>
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="new" className="gap-2"><Zap className="h-4 w-4" /> Neue Lösung</TabsTrigger>
+          <TabsTrigger value="history" className="gap-2"><History className="h-4 w-4" /> Verlauf ({history.length})</TabsTrigger>
+        </TabsList>
 
-      {isLoading && (
-        <Card className="border-primary/20">
-          <CardContent className="p-8 text-center">
-            <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
-            <p className="font-medium">KI analysiert Anforderungen…</p>
-            <p className="text-sm text-muted-foreground mt-1">3 Lösungsvarianten werden erstellt</p>
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="new" className="space-y-6 mt-4">
+          {selectedHistory && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Gespeicherte Lösung vom {new Date(selectedHistory.created_at).toLocaleDateString("de-DE")}</p>
+                  <p className="font-medium text-sm mt-1">{selectedHistory.projekt_name || selectedHistory.anforderungen.slice(0, 80)}</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedHistory(null)}>Neue erstellen</Button>
+              </CardContent>
+            </Card>
+          )}
 
-      {loesungen.length > 0 && (
-        <Tabs defaultValue={loesungen[0]?.typ || "best"} className="space-y-4">
-          <TabsList className="w-full justify-start">
-            {loesungen.map((l) => {
-              const Icon = tabIcons[l.typ] || Trophy;
-              return (
-                <TabsTrigger key={l.typ} value={l.typ} className="gap-2">
-                  <Icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{tabLabels[l.typ] || l.titel}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-          {loesungen.map((l) => (
-            <TabsContent key={l.typ} value={l.typ}><LoesungCard loesung={l} /></TabsContent>
-          ))}
-        </Tabs>
-      )}
+          {!selectedHistory && (
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex-1 min-w-[200px]">
+                    <Input placeholder="Projektname (optional)" value={projektName} onChange={(e) => setProjektName(e.target.value)} />
+                  </div>
+                  <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
+                </div>
+                <Textarea
+                  placeholder="Beschreiben Sie Ihre Anforderungen: Funktion, Belastung, Material, Abmessungen, Einsatzbereich…"
+                  rows={5}
+                  value={anforderungen}
+                  onChange={(e) => setAnforderungen(e.target.value)}
+                />
+                <RichMediaInput attachments={attachments} onAttachmentsChange={setAttachments} />
+                <Button onClick={generate} disabled={isLoading} className="gap-2 bg-primary hover:bg-primary/90">
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                  {isLoading ? "Generiere Lösungen…" : "Lösungen generieren"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-      {rawResponse && (
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Ergebnis</CardTitle></CardHeader>
-          <CardContent><pre className="text-sm whitespace-pre-wrap font-mono bg-muted p-4 rounded-md">{rawResponse}</pre></CardContent>
-        </Card>
-      )}
+          {isLoading && (
+            <Card className="border-primary/20">
+              <CardContent className="p-8 text-center">
+                <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
+                <p className="font-medium">KI analysiert Anforderungen…</p>
+                <p className="text-sm text-muted-foreground mt-1">3 Lösungsvarianten werden erstellt</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {displayLoesungen.length > 0 && (
+            <Tabs defaultValue={displayLoesungen[0]?.typ || "best"} className="space-y-4">
+              <TabsList className="w-full justify-start">
+                {displayLoesungen.map((l) => {
+                  const Icon = tabIcons[l.typ] || Trophy;
+                  return (
+                    <TabsTrigger key={l.typ} value={l.typ} className="gap-2">
+                      <Icon className="h-4 w-4" />
+                      <span className="hidden sm:inline">{tabLabels[l.typ] || l.titel}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+              {displayLoesungen.map((l) => (
+                <TabsContent key={l.typ} value={l.typ}><LoesungCard loesung={l} /></TabsContent>
+              ))}
+            </Tabs>
+          )}
+
+          {displayRaw && (
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-base">Ergebnis</CardTitle></CardHeader>
+              <CardContent><pre className="text-sm whitespace-pre-wrap font-mono bg-muted p-4 rounded-md">{displayRaw}</pre></CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <SolutionHistory history={history} onSelect={viewHistoryItem} onDelete={deleteSolution} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
