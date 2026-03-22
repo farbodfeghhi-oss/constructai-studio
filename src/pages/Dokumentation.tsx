@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import * as pdfjsLib from "pdfjs-dist";
 import {
   FileText, Download, CheckSquare, Search, Plus, Trash2, Copy, ClipboardList,
   BookOpen, FlaskConical, ShieldCheck, Database, Link2, Upload, Sparkles, Loader2, ExternalLink, X, Tag,
