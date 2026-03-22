@@ -554,7 +554,6 @@ export default function Dashboard() {
     </div>
   );
 }
-  const navigate = useNavigate();
   const location = useLocation();
   const [beschreibung, setBeschreibung] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
