@@ -74,6 +74,51 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_items: {
+        Row: {
+          ai_summary: string | null
+          category: string
+          content_type: string
+          created_at: string
+          description: string | null
+          extracted_text: string | null
+          file_url: string | null
+          id: string
+          keywords: string[] | null
+          link_url: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          ai_summary?: string | null
+          category: string
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          extracted_text?: string | null
+          file_url?: string | null
+          id?: string
+          keywords?: string[] | null
+          link_url?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          ai_summary?: string | null
+          category?: string
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          extracted_text?: string | null
+          file_url?: string | null
+          id?: string
+          keywords?: string[] | null
+          link_url?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
