@@ -265,6 +265,81 @@ export default function Dokumentation() {
     }
   };
 
+  /* PDF bulk import */
+  const handlePdfImport = async (file: File) => {
+    if (file.type !== "application/pdf") {
+      toast({ title: "Fehler", description: "Nur PDF-Dateien werden unterstützt.", variant: "destructive" });
+      return;
+    }
+    setPdfImporting(true);
+    setPdfProducts([]);
+    setPdfSelected(new Set());
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+      const data = new Uint8Array(await file.arrayBuffer());
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      const textParts: string[] = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((item: any) => item.str).join(" ");
+        if (pageText.trim()) textParts.push(pageText.trim());
+      }
+      const pdfText = textParts.join("\n\n");
+      if (!pdfText.trim()) {
+        toast({ title: "Kein Text gefunden", description: "Das PDF enthält keinen extrahierbaren Text.", variant: "destructive" });
+        setPdfImporting(false);
+        return;
+      }
+      const { data: result, error } = await supabase.functions.invoke("analyze-component", {
+        body: { mode: "bulk", pdfText, provider: aiProvider },
+      });
+      if (error) throw error;
+      if (result?.products?.length) {
+        setPdfProducts(result.products);
+        setPdfSelected(new Set(result.products.map((_: any, i: number) => i)));
+        toast({ title: `${result.products.length} Produkte erkannt`, description: "Bitte prüfen und bestätigen." });
+      } else {
+        toast({ title: "Keine Produkte erkannt", description: "Die KI konnte keine Produkte im PDF identifizieren.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Import fehlgeschlagen", description: e instanceof Error ? e.message : "Fehler", variant: "destructive" });
+    }
+    setPdfImporting(false);
+  };
+
+  const saveBulkProducts = async () => {
+    if (!user || pdfSelected.size === 0) return;
+    setSavingBulk(true);
+    const selected = pdfProducts.filter((_, i) => pdfSelected.has(i));
+    const rows = selected.map((p) => ({
+      user_id: user.id,
+      name: p.name || "Unbenannt",
+      description: p.description || null,
+      category: CATEGORIES.includes(p.category) ? p.category : "Sonstiges",
+      keywords: Array.isArray(p.keywords) ? p.keywords : [],
+      norm: p.norm || null,
+      material: p.material || null,
+      supplier: p.supplier || null,
+      price: p.price || null,
+      size: p.size || null,
+      url: null,
+      image_urls: [],
+      file_urls: [],
+      source: "ai_import",
+    }));
+    const { error } = await supabase.from("components").insert(rows);
+    if (error) {
+      toast({ title: "Fehler beim Speichern", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Gespeichert", description: `${rows.length} Produkte zur Datenbank hinzugefügt.` });
+      setPdfProducts([]);
+      setPdfSelected(new Set());
+      loadComponents();
+    }
+    setSavingBulk(false);
+  };
+
   const addBomRow = () => {
     if (!newRow.name.trim()) {
       toast({ title: "Bezeichnung erforderlich", description: "Bitte geben Sie eine Bezeichnung ein.", variant: "destructive" });
