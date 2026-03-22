@@ -155,6 +155,12 @@ export default function Dokumentation() {
   const [addAttachments, setAddAttachments] = useState<Attachment[]>([]);
   const [aiProvider, setAiProvider] = useState<AIProvider>("perplexity");
   const [analyzing, setAnalyzing] = useState(false);
+  
+  /* PDF bulk import state */
+  const [pdfImporting, setPdfImporting] = useState(false);
+  const [pdfProducts, setPdfProducts] = useState<any[]>([]);
+  const [pdfSelected, setPdfSelected] = useState<Set<number>>(new Set());
+  const [savingBulk, setSavingBulk] = useState(false);
 
   const loadComponents = useCallback(async () => {
     if (!user) return;
