@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, ChevronDown } from "lucide-react";
-import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
+import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, FileText, Search, Wand2, Download, Copy, Check } from "lucide-react";
+import { ProviderSelect, type AIProvider, type MonicaModel } from "@/components/ProviderSelect";
 import { RichMediaInput } from "@/components/RichMediaInput";
 import { type Attachment } from "@/components/AttachmentPreview";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -35,10 +36,237 @@ interface SavedSolution {
   raw_response: string | null;
 }
 
+interface DeepAnalysis {
+  festigkeit?: { beschreibung: string; berechnungen: string[]; sicherheitsfaktor: string };
+  toleranzen?: { bauteil: string; toleranz: string; passung: string; norm: string }[];
+  werkstoffkennwerte?: { material: string; zugfestigkeit: string; streckgrenze: string; haerte: string; dichte: string }[];
+  normenDetails?: { norm: string; titel: string; relevanz: string }[];
+  fertigungshinweise?: string[];
+  qualitaetspruefung?: string[];
+  rawResponse?: string;
+}
+
+interface TechnicalPrompts {
+  zeichnungsPrompt?: string;
+  stuecklistePrompt?: string;
+  praesentationPrompt?: string;
+  montagePrompt?: string;
+  rawResponse?: string;
+}
+
 const tabIcons: Record<string, typeof Trophy> = { best: Trophy, cheap: Coins, performance: Zap };
 const tabLabels: Record<string, string> = { best: "Beste Empfehlung", cheap: "Kostengünstig", performance: "Hochleistung" };
 
-function LoesungCard({ loesung }: { loesung: Loesung }) {
+function DeepAnalysisView({ analysis }: { analysis: DeepAnalysis }) {
+  if (analysis.rawResponse) {
+    return <pre className="text-sm whitespace-pre-wrap font-mono bg-muted p-4 rounded-md">{analysis.rawResponse}</pre>;
+  }
+  return (
+    <div className="space-y-4">
+      {analysis.festigkeit && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">🔩 Festigkeitsanalyse</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm">{analysis.festigkeit.beschreibung}</p>
+            <p className="text-xs text-muted-foreground">Sicherheitsfaktor: <span className="font-mono font-bold">{analysis.festigkeit.sicherheitsfaktor}</span></p>
+            {analysis.festigkeit.berechnungen?.map((b, i) => (
+              <p key={i} className="text-xs font-mono bg-muted p-2 rounded">{b}</p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      {analysis.toleranzen && analysis.toleranzen.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">📏 Toleranzen & Passungen</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader><TableRow><TableHead>Bauteil</TableHead><TableHead>Toleranz</TableHead><TableHead>Passung</TableHead><TableHead>Norm</TableHead></TableRow></TableHeader>
+              <TableBody>{analysis.toleranzen.map((t, i) => (
+                <TableRow key={i}><TableCell className="text-sm">{t.bauteil}</TableCell><TableCell className="font-mono text-xs">{t.toleranz}</TableCell><TableCell className="text-sm">{t.passung}</TableCell><TableCell className="font-mono text-xs">{t.norm}</TableCell></TableRow>
+              ))}</TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+      {analysis.werkstoffkennwerte && analysis.werkstoffkennwerte.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">🧪 Werkstoffkennwerte</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader><TableRow><TableHead>Material</TableHead><TableHead>Zugfestigkeit</TableHead><TableHead>Streckgrenze</TableHead><TableHead>Härte</TableHead><TableHead>Dichte</TableHead></TableRow></TableHeader>
+              <TableBody>{analysis.werkstoffkennwerte.map((w, i) => (
+                <TableRow key={i}><TableCell className="text-sm">{w.material}</TableCell><TableCell className="font-mono text-xs">{w.zugfestigkeit}</TableCell><TableCell className="font-mono text-xs">{w.streckgrenze}</TableCell><TableCell className="font-mono text-xs">{w.haerte}</TableCell><TableCell className="font-mono text-xs">{w.dichte}</TableCell></TableRow>
+              ))}</TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+      {analysis.fertigungshinweise && analysis.fertigungshinweise.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">🏭 Fertigungshinweise</CardTitle></CardHeader>
+          <CardContent><ul className="space-y-1">{analysis.fertigungshinweise.map((f, i) => <li key={i} className="text-sm">→ {f}</li>)}</ul></CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function PromptCopyCard({ label, prompt }: { label: string; prompt: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold">{label}</p>
+          <Button variant="ghost" size="sm" onClick={copy} className="gap-1.5">
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Kopiert" : "Kopieren"}
+          </Button>
+        </div>
+        <pre className="text-xs whitespace-pre-wrap font-mono bg-muted p-3 rounded-md max-h-40 overflow-y-auto">{prompt}</pre>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SolutionActions({ loesung, provider, model, projektName }: { loesung: Loesung; provider: AIProvider; model?: MonicaModel; projektName?: string }) {
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [deepAnalysis, setDeepAnalysis] = useState<DeepAnalysis | null>(null);
+  const [techPrompts, setTechPrompts] = useState<TechnicalPrompts | null>(null);
+  const [exportFormat, setExportFormat] = useState("pdf");
+
+  const runDeepAnalysis = async () => {
+    setLoadingAction("deep");
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-solutions", {
+        body: { provider, model, mode: "deep-analysis", loesung },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setDeepAnalysis(data);
+      toast({ title: "Analyse fertig", description: "Detaillierte Fachanalyse wurde erstellt." });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message || "Analyse fehlgeschlagen", variant: "destructive" });
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const generatePrompts = async () => {
+    setLoadingAction("prompt");
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-solutions", {
+        body: { provider, model, mode: "technical-prompt", loesung },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setTechPrompts(data);
+      toast({ title: "Prompts erstellt", description: "KI-Prompts für technische Dokumentation wurden generiert." });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message || "Prompt-Generierung fehlgeschlagen", variant: "destructive" });
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const exportDocument = async () => {
+    setLoadingAction("export");
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-document", {
+        body: { loesung, format: exportFormat, provider, model, projektName },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const content = data.content || "";
+      const mimeTypes: Record<string, string> = {
+        pdf: "text/markdown", docx: "text/markdown", xlsx: "text/csv", pptx: "application/json",
+      };
+      const extensions: Record<string, string> = {
+        pdf: "md", docx: "md", xlsx: "csv", pptx: "json",
+      };
+      
+      const blob = new Blob([content], { type: mimeTypes[exportFormat] || "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${loesung.titel.replace(/\s+/g, "_")}.${extensions[exportFormat] || "txt"}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Export fertig", description: `Dokument wurde heruntergeladen.` });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message || "Export fehlgeschlagen", variant: "destructive" });
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" className="gap-2" onClick={runDeepAnalysis} disabled={!!loadingAction}>
+          {loadingAction === "deep" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+          Detaillierte Fachanalyse
+        </Button>
+
+        <div className="flex gap-1.5 items-center">
+          <Select value={exportFormat} onValueChange={setExportFormat}>
+            <SelectTrigger className="w-[100px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pdf">PDF/MD</SelectItem>
+              <SelectItem value="docx">Anleitung</SelectItem>
+              <SelectItem value="xlsx">Stückliste</SelectItem>
+              <SelectItem value="pptx">Präsentation</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportDocument} disabled={!!loadingAction}>
+            {loadingAction === "export" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Exportieren
+          </Button>
+        </div>
+
+        <Button variant="outline" size="sm" className="gap-2" onClick={generatePrompts} disabled={!!loadingAction}>
+          {loadingAction === "prompt" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          KI-Prompt generieren
+        </Button>
+      </div>
+
+      {deepAnalysis && (
+        <Accordion type="single" collapsible defaultValue="deep">
+          <AccordionItem value="deep">
+            <AccordionTrigger className="text-sm font-semibold">🔬 Detaillierte Fachanalyse</AccordionTrigger>
+            <AccordionContent><DeepAnalysisView analysis={deepAnalysis} /></AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+
+      {techPrompts && (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">✨ Generierte KI-Prompts</p>
+          {techPrompts.rawResponse ? (
+            <pre className="text-xs whitespace-pre-wrap font-mono bg-muted p-4 rounded-md">{techPrompts.rawResponse}</pre>
+          ) : (
+            <>
+              {techPrompts.zeichnungsPrompt && <PromptCopyCard label="📐 Technische Zeichnung" prompt={techPrompts.zeichnungsPrompt} />}
+              {techPrompts.stuecklistePrompt && <PromptCopyCard label="📋 Stückliste (Excel)" prompt={techPrompts.stuecklistePrompt} />}
+              {techPrompts.praesentationPrompt && <PromptCopyCard label="📊 Präsentation" prompt={techPrompts.praesentationPrompt} />}
+              {techPrompts.montagePrompt && <PromptCopyCard label="🔧 Montage-Anleitung" prompt={techPrompts.montagePrompt} />}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoesungCard({ loesung, provider, model, projektName }: { loesung: Loesung; provider: AIProvider; model?: MonicaModel; projektName?: string }) {
   return (
     <div className="space-y-4">
       <Card>
@@ -112,6 +340,8 @@ function LoesungCard({ loesung }: { loesung: Loesung }) {
           </CardContent>
         </Card>
       )}
+
+      <SolutionActions loesung={loesung} provider={provider} model={model} projektName={projektName} />
     </div>
   );
 }
@@ -160,6 +390,7 @@ export default function Loesung() {
   const [loesungen, setLoesungen] = useState<Loesung[]>([]);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
   const [provider, setProvider] = useState<AIProvider>("monica");
+  const [monicaModel, setMonicaModel] = useState<MonicaModel>("gpt-4o");
   const [activeTab, setActiveTab] = useState("new");
   const [history, setHistory] = useState<SavedSolution[]>([]);
   const [selectedHistory, setSelectedHistory] = useState<SavedSolution | null>(null);
@@ -216,7 +447,7 @@ export default function Loesung() {
     try {
       const images = attachments.filter((a) => a.type === "image").map((a) => a.dataUrl);
       const { data, error } = await supabase.functions.invoke("generate-solutions", {
-        body: { projektName, anforderungen, provider, images },
+        body: { projektName, anforderungen, provider, model: provider === "monica" ? monicaModel : undefined, images },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -282,7 +513,7 @@ export default function Loesung() {
                   <div className="flex-1 min-w-[200px]">
                     <Input placeholder="Projektname (optional)" value={projektName} onChange={(e) => setProjektName(e.target.value)} />
                   </div>
-                  <ProviderSelect value={provider} onChange={setProvider} className="w-[160px]" />
+                  <ProviderSelect value={provider} onChange={setProvider} monicaModel={monicaModel} onMonicaModelChange={setMonicaModel} className="w-[160px]" />
                 </div>
                 <Textarea
                   placeholder="Beschreiben Sie Ihre Anforderungen: Funktion, Belastung, Material, Abmessungen, Einsatzbereich…"
@@ -323,7 +554,9 @@ export default function Loesung() {
                 })}
               </TabsList>
               {displayLoesungen.map((l) => (
-                <TabsContent key={l.typ} value={l.typ}><LoesungCard loesung={l} /></TabsContent>
+                <TabsContent key={l.typ} value={l.typ}>
+                  <LoesungCard loesung={l} provider={provider} model={provider === "monica" ? monicaModel : undefined} projektName={projektName} />
+                </TabsContent>
               ))}
             </Tabs>
           )}
