@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import * as pdfjsLib from "pdfjs-dist";
 import { Upload, Loader2, Languages, Copy, Check, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,25 +65,24 @@ export default function PDFTranslate() {
     }
   }, []);
 
-  const extractTextFromPDF = (data: Uint8Array): string => {
-    const text = new TextDecoder("latin1").decode(data);
-    const textBlocks: string[] = [];
-    const btEtRegex = /BT\s([\s\S]*?)ET/g;
-    let match;
-    while ((match = btEtRegex.exec(text)) !== null) {
-      const block = match[1];
-      const tjRegex = /\(([^)]*)\)\s*Tj/g;
-      let tjMatch;
-      while ((tjMatch = tjRegex.exec(block)) !== null) textBlocks.push(tjMatch[1]);
-      const tjArrayRegex = /\[([^\]]*)\]\s*TJ/g;
-      let tjArrMatch;
-      while ((tjArrMatch = tjArrayRegex.exec(block)) !== null) {
-        const strRegex = /\(([^)]*)\)/g;
-        let strMatch;
-        while ((strMatch = strRegex.exec(tjArrMatch[1])) !== null) textBlocks.push(strMatch[1]);
+  const extractTextFromPDF = async (data: Uint8Array): Promise<string> => {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+    
+    const pdf = await pdfjsLib.getDocument({ data }).promise;
+    const textParts: string[] = [];
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => item.str)
+        .join(" ");
+      if (pageText.trim()) {
+        textParts.push(pageText.trim());
       }
     }
-    return textBlocks.join(" ").replace(/\\n/g, "\n").replace(/\s+/g, " ").trim();
+    
+    return textParts.join("\n\n");
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
