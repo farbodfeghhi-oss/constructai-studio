@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import * as pdfjsLib from "pdfjs-dist";
 import {
   FileText, Download, CheckSquare, Search, Plus, Trash2, Copy, ClipboardList,
   BookOpen, FlaskConical, ShieldCheck, Database, Link2, Upload, Sparkles, Loader2, ExternalLink, X, Tag,
@@ -154,6 +155,12 @@ export default function Dokumentation() {
   const [addAttachments, setAddAttachments] = useState<Attachment[]>([]);
   const [aiProvider, setAiProvider] = useState<AIProvider>("perplexity");
   const [analyzing, setAnalyzing] = useState(false);
+  
+  /* PDF bulk import state */
+  const [pdfImporting, setPdfImporting] = useState(false);
+  const [pdfProducts, setPdfProducts] = useState<any[]>([]);
+  const [pdfSelected, setPdfSelected] = useState<Set<number>>(new Set());
+  const [savingBulk, setSavingBulk] = useState(false);
 
   const loadComponents = useCallback(async () => {
     if (!user) return;
@@ -258,8 +265,86 @@ export default function Dokumentation() {
     }
   };
 
+  /* PDF bulk import */
+  const handlePdfImport = async (file: File) => {
+    if (file.type !== "application/pdf") {
+      toast({ title: "Fehler", description: "Nur PDF-Dateien werden unterstützt.", variant: "destructive" });
+      return;
+    }
+    setPdfImporting(true);
+    setPdfProducts([]);
+    setPdfSelected(new Set());
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+      const data = new Uint8Array(await file.arrayBuffer());
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      const textParts: string[] = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((item: any) => item.str).join(" ");
+        if (pageText.trim()) textParts.push(pageText.trim());
+      }
+      const pdfText = textParts.join("\n\n");
+      if (!pdfText.trim()) {
+        toast({ title: "Kein Text gefunden", description: "Das PDF enthält keinen extrahierbaren Text.", variant: "destructive" });
+        setPdfImporting(false);
+        return;
+      }
+      const { data: result, error } = await supabase.functions.invoke("analyze-component", {
+        body: { mode: "bulk", pdfText, provider: aiProvider },
+      });
+      if (error) throw error;
+      if (result?.products?.length) {
+        setPdfProducts(result.products);
+        setPdfSelected(new Set(result.products.map((_: any, i: number) => i)));
+        toast({ title: `${result.products.length} Produkte erkannt`, description: "Bitte prüfen und bestätigen." });
+      } else {
+        toast({ title: "Keine Produkte erkannt", description: "Die KI konnte keine Produkte im PDF identifizieren.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Import fehlgeschlagen", description: e instanceof Error ? e.message : "Fehler", variant: "destructive" });
+    }
+    setPdfImporting(false);
+  };
+
+  const saveBulkProducts = async () => {
+    if (!user || pdfSelected.size === 0) return;
+    setSavingBulk(true);
+    const selected = pdfProducts.filter((_, i) => pdfSelected.has(i));
+    const rows = selected.map((p) => ({
+      user_id: user.id,
+      name: p.name || "Unbenannt",
+      description: p.description || null,
+      category: CATEGORIES.includes(p.category) ? p.category : "Sonstiges",
+      keywords: Array.isArray(p.keywords) ? p.keywords : [],
+      norm: p.norm || null,
+      material: p.material || null,
+      supplier: p.supplier || null,
+      price: p.price || null,
+      size: p.size || null,
+      url: null,
+      image_urls: [],
+      file_urls: [],
+      source: "ai_import",
+    }));
+    const { error } = await supabase.from("components").insert(rows);
+    if (error) {
+      toast({ title: "Fehler beim Speichern", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Gespeichert", description: `${rows.length} Produkte zur Datenbank hinzugefügt.` });
+      setPdfProducts([]);
+      setPdfSelected(new Set());
+      loadComponents();
+    }
+    setSavingBulk(false);
+  };
+
   const addBomRow = () => {
-    if (!newRow.name.trim()) return;
+    if (!newRow.name.trim()) {
+      toast({ title: "Bezeichnung erforderlich", description: "Bitte geben Sie eine Bezeichnung ein.", variant: "destructive" });
+      return;
+    }
     const row: BomRow = {
       id: Date.now().toString(), pos: bom.length + 1,
       name: newRow.name, norm: newRow.norm || "—", material: newRow.material || "—",
@@ -267,6 +352,7 @@ export default function Dokumentation() {
     };
     setBom((prev) => [...prev, row]);
     setNewRow({ name: "", norm: "", material: "", menge: "1", preis: "" });
+    toast({ title: "Hinzugefügt", description: `${row.name} wurde zur Stückliste hinzugefügt.` });
   };
 
   const removeBomRow = (id: string) => {
@@ -447,6 +533,15 @@ export default function Dokumentation() {
             </div>
             <div className="flex gap-2">
               <ProviderSelect value={aiProvider} onChange={setAiProvider} className="w-[150px]" />
+              <Button variant="secondary" className="gap-1.5" onClick={() => document.getElementById("pdf-catalog-input")?.click()} disabled={pdfImporting}>
+                {pdfImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                PDF-Katalog importieren
+              </Button>
+              <input id="pdf-catalog-input" type="file" accept=".pdf" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handlePdfImport(file);
+                e.target.value = "";
+              }} />
               <Button className="gap-1.5" onClick={() => setShowAddForm(!showAddForm)}>
                 {showAddForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                 {showAddForm ? "Schließen" : "Produkt hinzufügen"}
@@ -534,6 +629,67 @@ export default function Dokumentation() {
                   <Button onClick={saveComponent} disabled={!addForm.name.trim()} className="gap-1.5">
                     <Download className="h-4 w-4" /> Speichern
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* PDF bulk import review */}
+          {pdfProducts.length > 0 && (
+            <Card className="border-primary/30">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" /> {pdfProducts.length} Produkte aus PDF erkannt
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      if (pdfSelected.size === pdfProducts.length) setPdfSelected(new Set());
+                      else setPdfSelected(new Set(pdfProducts.map((_, i) => i)));
+                    }}>
+                      {pdfSelected.size === pdfProducts.length ? "Alle abwählen" : "Alle auswählen"}
+                    </Button>
+                    <Button size="sm" className="gap-1.5" onClick={saveBulkProducts} disabled={savingBulk || pdfSelected.size === 0}>
+                      {savingBulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      {pdfSelected.size} Produkte speichern
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setPdfProducts([]); setPdfSelected(new Set()); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {pdfProducts.map((p, i) => (
+                    <label key={i} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors">
+                      <Checkbox
+                        checked={pdfSelected.has(i)}
+                        onCheckedChange={(v) => {
+                          const next = new Set(pdfSelected);
+                          if (v) next.add(i); else next.delete(i);
+                          setPdfSelected(next);
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">{p.name || "Unbenannt"}</span>
+                          {p.category && <Badge variant="secondary" className="text-[10px]">{p.category}</Badge>}
+                          {p.norm && <Badge variant="outline" className="text-[10px] font-mono">{p.norm}</Badge>}
+                        </div>
+                        {p.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>}
+                        <div className="flex gap-2 mt-1 flex-wrap">
+                          {p.material && <span className="text-[10px] text-muted-foreground">Material: {p.material}</span>}
+                          {p.supplier && <span className="text-[10px] text-muted-foreground">Lieferant: {p.supplier}</span>}
+                          {p.price && <span className="text-[10px] text-muted-foreground">Preis: {p.price}</span>}
+                          {p.keywords?.length > 0 && (
+                            <span className="text-[10px] text-muted-foreground">Keywords: {p.keywords.slice(0, 5).join(", ")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </CardContent>
             </Card>
