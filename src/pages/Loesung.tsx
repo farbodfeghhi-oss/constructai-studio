@@ -446,8 +446,9 @@ export default function Loesung() {
 
     try {
       const images = attachments.filter((a) => a.type === "image").map((a) => a.dataUrl);
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase.functions.invoke("generate-solutions", {
-        body: { projektName, anforderungen, provider, model: provider === "monica" ? monicaModel : undefined, images },
+        body: { projektName, anforderungen, provider, model: provider === "monica" ? monicaModel : undefined, images, userId: user?.id },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
