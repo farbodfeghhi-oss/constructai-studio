@@ -634,6 +634,67 @@ export default function Dokumentation() {
             </Card>
           )}
 
+          {/* PDF bulk import review */}
+          {pdfProducts.length > 0 && (
+            <Card className="border-primary/30">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" /> {pdfProducts.length} Produkte aus PDF erkannt
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      if (pdfSelected.size === pdfProducts.length) setPdfSelected(new Set());
+                      else setPdfSelected(new Set(pdfProducts.map((_, i) => i)));
+                    }}>
+                      {pdfSelected.size === pdfProducts.length ? "Alle abwählen" : "Alle auswählen"}
+                    </Button>
+                    <Button size="sm" className="gap-1.5" onClick={saveBulkProducts} disabled={savingBulk || pdfSelected.size === 0}>
+                      {savingBulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      {pdfSelected.size} Produkte speichern
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setPdfProducts([]); setPdfSelected(new Set()); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {pdfProducts.map((p, i) => (
+                    <label key={i} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors">
+                      <Checkbox
+                        checked={pdfSelected.has(i)}
+                        onCheckedChange={(v) => {
+                          const next = new Set(pdfSelected);
+                          if (v) next.add(i); else next.delete(i);
+                          setPdfSelected(next);
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">{p.name || "Unbenannt"}</span>
+                          {p.category && <Badge variant="secondary" className="text-[10px]">{p.category}</Badge>}
+                          {p.norm && <Badge variant="outline" className="text-[10px] font-mono">{p.norm}</Badge>}
+                        </div>
+                        {p.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>}
+                        <div className="flex gap-2 mt-1 flex-wrap">
+                          {p.material && <span className="text-[10px] text-muted-foreground">Material: {p.material}</span>}
+                          {p.supplier && <span className="text-[10px] text-muted-foreground">Lieferant: {p.supplier}</span>}
+                          {p.price && <span className="text-[10px] text-muted-foreground">Preis: {p.price}</span>}
+                          {p.keywords?.length > 0 && (
+                            <span className="text-[10px] text-muted-foreground">Keywords: {p.keywords.slice(0, 5).join(", ")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Product list */}
           <Card>
             <div className="px-4 py-3 border-b flex items-center justify-between">
