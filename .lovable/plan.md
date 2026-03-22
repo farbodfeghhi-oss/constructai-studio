@@ -1,81 +1,77 @@
 
 
-## Plan: Komponenten-Datenbank mit AI-Suche und Dokumentation als Referenz-System
+## Plan: Loesung-Aktionsoptionen, Monica-Modellauswahl und Dokument-Generierung
 
 ### Zusammenfassung
 
-Die **Dokumentation** wird zur zentralen Datenbank/Referenz, in der Nutzer Produkt-Links, PDFs, Katalogbilder und Beschreibungen speichern. Die **Komponenten-Suche** durchsucht diese Datenbank UND kann via Perplexity API im Internet suchen. AI-gestützte Metadaten-Vorschläge unterstützen den Nutzer bei der Erfassung.
+Drei Hauptbereiche: (1) Aktionsbuttons unter jeder Loesung, (2) Monica-Modellauswahl bei allen KI-Chats, (3) Dokumentgenerierung via Edge Functions.
 
-### Datenbank-Schema
+**Wichtiger Hinweis zu Monica-Tools**: "Manus PDF zu PPT", "Nano Banana PPT" und "KI-Praesentationsersteller" sind **keine API-Endpunkte** von Monica -- sie sind nur in der Monica-App/Browser-Extension verfuegbar. Monica's API bietet ausschliesslich Chat Completions (OpenAI-kompatibel). Die gewuenschten Funktionen werden stattdessen ueber die Chat-API mit spezialisierten Prompts und lokaler Dokumentgenerierung (PPTX, PDF, DOCX, XLSX) umgesetzt.
 
-Neue Tabelle `components` mit RLS (nur eigene Einträge sehen/bearbeiten):
+---
+
+### Teil 1: Aktions-Buttons unter jeder Loesung
+
+Unter jeder der 3 Loesungsvarianten (Beste/Kostenguenstig/Hochleistung) erscheinen 3 Aktions-Buttons:
+
+1. **"Detaillierte Fachanalyse"** -- Ruft die Edge Function mit der gewaehlten Loesung erneut auf und fordert tiefere technische Details an (Berechnungen, Toleranzen, Werkstoffkennwerte, Normendetails). Ergebnis wird als expandierbarer Bereich unter der Loesung angezeigt.
+
+2. **"Als PDF/Word exportieren"** -- Generiert ueber eine neue Edge Function (`generate-document`) ein PDF oder DOCX mit der kompletten Loesung inkl. Komponentenliste, Vor-/Nachteile, Kosten. Download-Link wird dem Nutzer praesentiert.
+
+3. **"KI-Prompt generieren"** -- Erstellt einen detaillierten, fachlichen Prompt, den der Nutzer in andere KI-Tools kopieren kann, um technische Zeichnungen, Stuecklisten (Excel), Praesentationen und Montageanleitungen zu generieren. Nutzt die bestehende `generate-prompt` Edge Function mit angepasstem System-Prompt.
+
+### Teil 2: Monica-Modellauswahl
+
+Wenn der Nutzer "Monica AI" als Provider waehlt, erscheint ein zusaetzliches Dropdown mit verfuegbaren Monica-Modellen:
 
 ```text
-components
-  id            uuid PK
-  user_id       uuid FK -> auth.users
-  name          text NOT NULL
-  description   text
-  category      text (Maschinenelemente | Blech | Montage | Elektro | ...)
-  keywords      text[]
-  norm          text
-  material      text
-  supplier      text
-  price         text
-  size          text
-  url           text           -- Produkt-Link
-  image_urls    text[]         -- Bilder (base64 oder Storage-URLs)
-  file_urls     text[]         -- PDFs, Katalogseiten
-  source        text           -- 'manual' | 'web_search' | 'ai_import'
-  created_at    timestamptz
-  updated_at    timestamptz
+Monica-Modelle (via openapi.monica.im):
+- gpt-4o (Standard)
+- gpt-4.1
+- gpt-4.1-mini
+- gpt-4o-mini
+- claude-sonnet-4-20250514
+- claude-3-7-sonnet-latest
+- gemini-2.5-pro
+- gemini-2.5-flash
+- deepseek-chat (DeepSeek V3)
+- o4-mini (Reasoning)
 ```
 
-Storage Bucket `component-files` fuer PDFs und Bilder.
+Die Modellauswahl wird an alle Edge Functions weitergeleitet, die Monica nutzen.
 
-### Edge Function: `search-components`
+### Teil 3: Dokument-Generierung (Ersatz fuer Monica-Tools)
 
-Neue Edge Function die Perplexity API nutzt um im Internet nach technischen Komponenten zu suchen basierend auf Nutzerbeschreibung + optionalen Keywords + optionalem Bild. Gibt strukturierte Ergebnisse zurueck (Name, Beschreibung, Link, geschaetzter Preis, Lieferant).
-
-### Edge Function: `analyze-component`
-
-Neue Edge Function die hochgeladene PDFs/Bilder analysiert und Metadaten vorschlaegt: Name, Kategorie, Keywords, Norm, Material. Nutzt Perplexity/Monica je nach Provider-Auswahl.
-
-### Dokumentation-Seite (Umbau)
-
-Bestehende Tabs bleiben erhalten. Neuer Tab **"Produkt-Datenbank"**:
-
-- **Produkt hinzufuegen**: Formular mit Feldern fuer Link, Beschreibung, Kategorie, Keywords, Dateien (PDF/Bilder)
-- **AI-Assistent**: Beim Einfuegen eines Links oder Hochladen einer Datei analysiert AI den Inhalt und schlaegt Kategorie, Keywords, Beschreibung vor
-- **Nutzer bestaetigt/korrigiert** die AI-Vorschlaege vor dem Speichern
-- **Produktliste**: Durchsuchbare Tabelle aller gespeicherten Produkte mit Filtern
-
-### Komponenten-Suche (Umbau)
-
-Bestehende hardcoded Daten + Datenbank-Ergebnisse zusammen durchsuchen:
-
-1. **Lokale Suche**: Durchsucht `components`-Tabelle nach Keywords/Name/Kategorie
-2. **AI-Websuche**: Neuer Bereich "Intelligente Suche" -- Nutzer beschreibt was gebraucht wird (Textarea + optionale Keywords + Bild-Upload via RichMediaInput)
-3. **Suchergebnisse**: AI-Ergebnisse werden als Karten angezeigt mit "Zur Dokumentation hinzufuegen"-Button
-4. **Archivieren**: Bei Bestaetigung wird das Ergebnis in die `components`-Tabelle gespeichert
-
-### AI-Unterstuetzung ueberall
-
-- **Dokumentation**: AI schlaegt Metadaten vor beim Hinzufuegen
-- **Komponenten-Suche**: AI-Websuche + AI-Vorschlaege fuer aehnliche Produkte
-- **Smart Autocomplete**: Kategorie- und Keyword-Vorschlaege basierend auf Beschreibung
+Neue Edge Function `generate-document`:
+- Nimmt eine Loesung + gewuenschtes Format (pdf/docx/pptx/xlsx)
+- Nutzt Monica/Perplexity API um strukturierten Inhalt zu generieren
+- Generiert das Dokument serverseitig und gibt es als Download zurueck
+- **PDF**: Technische Dokumentation mit Loesungsbeschreibung, Komponentenliste, Kosten
+- **PPTX**: Praesentationsfolien mit der Loesung (via pptxgenjs-Stil Prompt)
+- **XLSX**: Stueckliste als Excel-Datei
+- **DOCX**: Montage-/Fertigungsanleitung
 
 ### Dateien
 
 | Aktion | Datei |
 |--------|------|
-| Migration | `components`-Tabelle + RLS + Storage Bucket |
-| Create | `supabase/functions/search-components/index.ts` |
-| Create | `supabase/functions/analyze-component/index.ts` |
-| Modify | `src/pages/Dokumentation.tsx` -- Neuer Tab "Produkt-Datenbank" |
-| Modify | `src/pages/Komponenten.tsx` -- AI-Websuche + DB-Integration |
+| Modify | `src/pages/Loesung.tsx` -- Aktionsbuttons + Modellauswahl |
+| Modify | `src/components/ProviderSelect.tsx` -- Monica-Modell-Dropdown |
+| Create | `supabase/functions/generate-document/index.ts` -- PDF/DOCX/PPTX/XLSX Generierung |
+| Modify | `supabase/functions/generate-solutions/index.ts` -- Modellparameter akzeptieren |
+| Modify | `supabase/functions/generate-prompt/index.ts` -- Technischer Prompt fuer Dokumentation |
+| Modify | `supabase/config.toml` -- neue Function registrieren |
 
-### Clever AI
+### Technische Details
 
-Zur Integration von "Clever AI": Es konnte keine oeffentliche API-Dokumentation fuer diesen Dienst gefunden werden. Bitte teile die genaue URL oder den Anbieter-Namen mit, damit ich die Moeglichkeiten pruefen kann.
+**generate-document Edge Function:**
+- Akzeptiert: `{ loesung, format, provider, model }`
+- Fuer PDF/DOCX: Nutzt die KI um strukturierten Markdown zu generieren, konvertiert dann serverseitig
+- Fuer PPTX: Generiert JSON-Struktur der Slides via KI, baut PPTX
+- Fuer XLSX: Erstellt Komponentenliste als CSV/strukturiertes Format
+- Gibt Base64-encodierte Datei zurueck zum direkten Download
+
+**Detaillierte Fachanalyse:**
+- Neue Edge Function `generate-deep-analysis` oder Erweiterung von `generate-solutions` mit einem `mode: "deep"` Parameter
+- System-Prompt fordert: Festigkeitsberechnungen, Toleranzanalyse, Werkstoffdatenblaetter, relevante DIN/ISO Details
 
