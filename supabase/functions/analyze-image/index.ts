@@ -43,6 +43,29 @@ const PROVIDERS = {
   },
 };
 
+async function requestCompletion(
+  providerKey: keyof typeof PROVIDERS,
+  messages: Array<{ role: string; content: string | unknown[] }>,
+) {
+  const cfg = PROVIDERS[providerKey];
+  const apiKey = Deno.env.get(cfg.keyEnv);
+  if (!apiKey) throw new Error(`${cfg.keyEnv} is not configured`);
+
+  const response = await fetch(cfg.url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages,
+    }),
+  });
+
+  return response;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -61,9 +84,14 @@ serve(async (req) => {
       });
     }
 
-    const cfg = PROVIDERS[provider as keyof typeof PROVIDERS] || PROVIDERS.perplexity;
-    const apiKey = Deno.env.get(cfg.keyEnv);
-    if (!apiKey) throw new Error(`${cfg.keyEnv} is not configured`);
+    if (imageList.some((img) => img.startsWith("data:image/heic") || img.startsWith("data:image/heif"))) {
+      return new Response(JSON.stringify({ error: "HEIC/HEIF wird noch nicht unterstützt. Bitte nutzen Sie JPG oder PNG." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const selectedProvider = (provider as keyof typeof PROVIDERS) || "perplexity";
 
     const userContent: any[] = [];
 
@@ -80,20 +108,18 @@ serve(async (req) => {
       text: prompt || `Analysiere ${imageList.length > 1 ? "diese technischen Bilder" : "dieses technische Bild"}. Erkenne alle Komponenten, Materialien, Normen und potenzielle Probleme.`,
     });
 
-    const response = await fetch(cfg.url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
-      }),
-    });
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userContent },
+    ];
+
+    let effectiveProvider = selectedProvider;
+    let response = await requestCompletion(selectedProvider, messages);
+
+    if (!response.ok && selectedProvider === "perplexity" && response.status >= 500) {
+      response = await requestCompletion("monica", messages);
+      effectiveProvider = "monica";
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -107,7 +133,7 @@ serve(async (req) => {
         });
       }
       const text = await response.text();
-      console.error(`${provider} API error:`, response.status, text);
+      console.error(`${effectiveProvider} API error:`, response.status, text);
       return new Response(JSON.stringify({ error: "KI-Analyse fehlgeschlagen" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

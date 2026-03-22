@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
 
 interface RichMediaInputProps {
   attachments: Attachment[];
-  onAttachmentsChange: (attachments: Attachment[]) => void;
+  onAttachmentsChange: React.Dispatch<React.SetStateAction<Attachment[]>>;
   acceptImages?: boolean;
   acceptFiles?: boolean;
   acceptAudio?: boolean;
@@ -38,26 +38,41 @@ export function RichMediaInput({
 
   const addAttachment = useCallback(
     (att: Omit<Attachment, "id">) => {
-      if (attachments.length >= maxFiles) {
-        toast({ title: "Maximum erreicht", description: `Maximal ${maxFiles} Anhänge erlaubt.`, variant: "destructive" });
-        return;
-      }
-      onAttachmentsChange([...attachments, { ...att, id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }]);
+      onAttachmentsChange((current) => {
+        if (current.length >= maxFiles) {
+          toast({ title: "Maximum erreicht", description: `Maximal ${maxFiles} Anhänge erlaubt.`, variant: "destructive" });
+          return current;
+        }
+
+        return [...current, { ...att, id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }];
+      });
     },
-    [attachments, onAttachmentsChange, maxFiles]
+    [onAttachmentsChange, maxFiles]
   );
 
   const removeAttachment = useCallback(
     (id: string) => {
-      onAttachmentsChange(attachments.filter((a) => a.id !== id));
+      onAttachmentsChange((current) => current.filter((a) => a.id !== id));
     },
-    [attachments, onAttachmentsChange]
+    [onAttachmentsChange]
   );
 
   const handleFiles = useCallback(
     (files: FileList | null, type: "image" | "file") => {
       if (!files) return;
       Array.from(files).forEach((file) => {
+        const normalizedName = file.name.toLowerCase();
+        const isHeic = normalizedName.endsWith(".heic") || normalizedName.endsWith(".heif") || file.type === "image/heic" || file.type === "image/heif";
+
+        if (type === "image" && isHeic) {
+          toast({
+            title: "HEIC wird noch nicht unterstützt",
+            description: "Bitte das Bild als JPG oder PNG auswählen.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         if (file.size > maxSizeMB * 1024 * 1024) {
           toast({ title: "Datei zu groß", description: `Max. ${maxSizeMB} MB: ${file.name}`, variant: "destructive" });
           return;

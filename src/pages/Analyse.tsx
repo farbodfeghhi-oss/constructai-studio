@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Upload, Loader2, AlertTriangle, CheckCircle, Info, ArrowRight, Wrench, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { Loader2, AlertTriangle, CheckCircle, Info, ArrowRight, Wrench, RefreshCw, ArrowLeft } from "lucide-react";
 import { ProviderSelect, type AIProvider } from "@/components/ProviderSelect";
 import { RichMediaInput } from "@/components/RichMediaInput";
 import { type Attachment } from "@/components/AttachmentPreview";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useLocation, useNavigate } from "react-router-dom";
 
 interface AnalysisResult {
   erkannteTeile: { name: string; norm: string; material: string; groesse: string }[];
@@ -32,10 +33,14 @@ const severityClass: Record<string, string> = {
 };
 
 export default function Analyse() {
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dashboardState = location.state as { fromDashboard?: boolean; dashboardDraft?: { description?: string; attachments?: Attachment[] } } | null;
+
+  const [attachments, setAttachments] = useState<Attachment[]>(() => dashboardState?.dashboardDraft?.attachments ?? []);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [provider, setProvider] = useState<AIProvider>("perplexity");
+  const [provider, setProvider] = useState<AIProvider>("monica");
 
   const hasImages = attachments.some((a) => a.type === "image");
 
@@ -68,10 +73,24 @@ export default function Analyse() {
     setResult(null);
   };
 
+  const zurueckZumDashboard = () => {
+    navigate("/", {
+      state: {
+        description: dashboardState?.dashboardDraft?.description ?? "",
+        attachments,
+      },
+    });
+  };
+
   return (
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
+          {dashboardState?.fromDashboard && (
+            <Button variant="ghost" size="sm" className="mb-3 gap-2" onClick={zurueckZumDashboard}>
+              <ArrowLeft className="h-4 w-4" /> Zurück zum Dashboard
+            </Button>
+          )}
           <h1 className="text-2xl font-bold">Bild-Analyse</h1>
           <p className="text-muted-foreground mt-1">KI-gestützte Erkennung technischer Komponenten aus Bildern und Skizzen.</p>
         </div>

@@ -1,10 +1,13 @@
-import { Upload, Search, Layers, BookOpen, PenTool, ClipboardList, ArrowRight, MoreHorizontal } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Upload, Search, Layers, BookOpen, PenTool, ClipboardList, ArrowRight, MoreHorizontal, ImagePlus, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
+import { RichMediaInput } from "@/components/RichMediaInput";
+import { type Attachment } from "@/components/AttachmentPreview";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const quickActions = [
   { title: "Normteil-Suche", desc: "DIN/ISO Standardteile finden", icon: Search, route: "/komponenten" },
@@ -30,6 +33,28 @@ const statusColor: Record<string, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [beschreibung, setBeschreibung] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  useEffect(() => {
+    const state = location.state as { description?: string; attachments?: Attachment[] } | null;
+    if (!state) return;
+    setBeschreibung(state.description ?? "");
+    setAttachments(state.attachments ?? []);
+  }, [location.state]);
+
+  const weiterZumPassendenBereich = () => {
+    const nextState = {
+      fromDashboard: true,
+      dashboardDraft: {
+        description: beschreibung,
+        attachments,
+      },
+    };
+
+    navigate(beschreibung.trim() ? "/loesung" : "/analyse", { state: nextState });
+  };
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -44,23 +69,50 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div
-            className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer"
-            onClick={() => navigate("/analyse")}
-          >
-            <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Bild oder Skizze hierher ziehen oder <span className="text-primary font-medium">durchsuchen</span>
-            </p>
-            <p className="text-xs text-muted-foreground/60 mt-1">JPG, PNG — max. 10 MB</p>
+          <div className="rounded-lg border border-border bg-background/70 p-5 space-y-4">
+            <div className="flex items-start gap-3 text-sm text-muted-foreground">
+              <Upload className="h-5 w-5 mt-0.5 text-primary" />
+              <div>
+                <p className="font-medium text-foreground">Projektbeschreibung und Bilder direkt hier vorbereiten</p>
+                <p>Mit Beschreibung geht es weiter zu Lösungsvorschlägen, ohne Beschreibung direkt zur Bild-Analyse.</p>
+              </div>
+            </div>
+
+            <RichMediaInput
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              acceptFiles={false}
+              acceptAudio={false}
+              acceptScreenshot={true}
+            />
+
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  {attachments.filter((item) => item.type === "image").length} Bild(er)
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">
+                  <FileText className="h-3.5 w-3.5" />
+                  Entwurf bleibt beim Zurückgehen erhalten
+                </span>
+              </div>
+            )}
           </div>
+
           <div className="flex gap-3">
             <Input
+              value={beschreibung}
+              onChange={(e) => setBeschreibung(e.target.value)}
               placeholder="Projektbeschreibung eingeben…"
               className="flex-1"
             />
-            <Button className="gap-2 bg-primary hover:bg-primary/90">
-              Analysieren starten
+            <Button
+              className="gap-2 bg-primary hover:bg-primary/90"
+              onClick={weiterZumPassendenBereich}
+              disabled={!beschreibung.trim() && attachments.length === 0}
+            >
+              {beschreibung.trim() ? "Mit Beschreibung weiter" : "Zur Bild-Analyse"}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
