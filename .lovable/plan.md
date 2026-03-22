@@ -1,77 +1,73 @@
 
 
-## Plan: Loesung-Aktionsoptionen, Monica-Modellauswahl und Dokument-Generierung
+## Plan: "Wissen" (Knowledge Base) Bereich auf dem Dashboard
 
 ### Zusammenfassung
 
-Drei Hauptbereiche: (1) Aktionsbuttons unter jeder Loesung, (2) Monica-Modellauswahl bei allen KI-Chats, (3) Dokumentgenerierung via Edge Functions.
+Ein neuer "Wissen"-Bereich auf dem Dashboard, in dem Nutzer Bilder, PDFs, Praesentationen und Links hochladen und kategorisieren koennen. Die Inhalte werden in der Datenbank gespeichert und von der KI gelesen, um bessere Loesungsvorschlaege zu liefern.
 
-**Wichtiger Hinweis zu Monica-Tools**: "Manus PDF zu PPT", "Nano Banana PPT" und "KI-Praesentationsersteller" sind **keine API-Endpunkte** von Monica -- sie sind nur in der Monica-App/Browser-Extension verfuegbar. Monica's API bietet ausschliesslich Chat Completions (OpenAI-kompatibel). Die gewuenschten Funktionen werden stattdessen ueber die Chat-API mit spezialisierten Prompts und lokaler Dokumentgenerierung (PPTX, PDF, DOCX, XLSX) umgesetzt.
+### Datenbank
 
----
-
-### Teil 1: Aktions-Buttons unter jeder Loesung
-
-Unter jeder der 3 Loesungsvarianten (Beste/Kostenguenstig/Hochleistung) erscheinen 3 Aktions-Buttons:
-
-1. **"Detaillierte Fachanalyse"** -- Ruft die Edge Function mit der gewaehlten Loesung erneut auf und fordert tiefere technische Details an (Berechnungen, Toleranzen, Werkstoffkennwerte, Normendetails). Ergebnis wird als expandierbarer Bereich unter der Loesung angezeigt.
-
-2. **"Als PDF/Word exportieren"** -- Generiert ueber eine neue Edge Function (`generate-document`) ein PDF oder DOCX mit der kompletten Loesung inkl. Komponentenliste, Vor-/Nachteile, Kosten. Download-Link wird dem Nutzer praesentiert.
-
-3. **"KI-Prompt generieren"** -- Erstellt einen detaillierten, fachlichen Prompt, den der Nutzer in andere KI-Tools kopieren kann, um technische Zeichnungen, Stuecklisten (Excel), Praesentationen und Montageanleitungen zu generieren. Nutzt die bestehende `generate-prompt` Edge Function mit angepasstem System-Prompt.
-
-### Teil 2: Monica-Modellauswahl
-
-Wenn der Nutzer "Monica AI" als Provider waehlt, erscheint ein zusaetzliches Dropdown mit verfuegbaren Monica-Modellen:
+Neue Tabelle `knowledge_items` mit RLS (nur eigene Eintraege):
 
 ```text
-Monica-Modelle (via openapi.monica.im):
-- gpt-4o (Standard)
-- gpt-4.1
-- gpt-4.1-mini
-- gpt-4o-mini
-- claude-sonnet-4-20250514
-- claude-3-7-sonnet-latest
-- gemini-2.5-pro
-- gemini-2.5-flash
-- deepseek-chat (DeepSeek V3)
-- o4-mini (Reasoning)
+knowledge_items
+  id              uuid PK
+  user_id         uuid NOT NULL
+  title           text NOT NULL
+  description     text
+  category        text NOT NULL
+  content_type    text  ('pdf' | 'image' | 'link' | 'presentation' | 'other')
+  file_url        text  -- Storage-URL fuer hochgeladene Dateien
+  link_url        text  -- fuer Internet-Links
+  extracted_text  text  -- von KI extrahierter/zusammengefasster Inhalt
+  ai_summary      text  -- KI-Zusammenfassung
+  keywords        text[]
+  created_at      timestamptz
 ```
 
-Die Modellauswahl wird an alle Edge Functions weitergeleitet, die Monica nutzen.
+Dateien werden im bestehenden `component-files` Storage Bucket gespeichert (oder einem neuen `knowledge-files` Bucket).
 
-### Teil 3: Dokument-Generierung (Ersatz fuer Monica-Tools)
+### Dashboard-Integration
 
-Neue Edge Function `generate-document`:
-- Nimmt eine Loesung + gewuenschtes Format (pdf/docx/pptx/xlsx)
-- Nutzt Monica/Perplexity API um strukturierten Inhalt zu generieren
-- Generiert das Dokument serverseitig und gibt es als Download zurueck
-- **PDF**: Technische Dokumentation mit Loesungsbeschreibung, Komponentenliste, Kosten
-- **PPTX**: Praesentationsfolien mit der Loesung (via pptxgenjs-Stil Prompt)
-- **XLSX**: Stueckliste als Excel-Datei
-- **DOCX**: Montage-/Fertigungsanleitung
+Neuer Bereich "Wissen" auf dem Dashboard zwischen Quick Actions und Aktuelle Projekte:
+
+- **Upload-Karte**: Drag-and-drop oder Dateiauswahl fuer PDFs, Bilder, Praesentationen + URL-Eingabefeld fuer Links
+- **Kategorie-Auswahl**: Nutzer waehlt/erstellt Kategorie (z.B. "Werkstoffe", "Normteile", "Fertigungsverfahren", "Elektro")
+- **KI-Verarbeitung**: Nach Upload analysiert die KI den Inhalt (PDF-Text, Bild-Erkennung, Link-Scraping) und erstellt Zusammenfassung + Keywords
+- **Uebersicht**: Kompakte Liste der letzten Wissenseintraege mit Kategorie-Badges und Suchfeld
+
+### KI-Integration in Loesungsvorschlaege
+
+Die `generate-solutions` Edge Function wird erweitert:
+- Vor dem Generieren werden relevante `knowledge_items` des Nutzers aus der DB geladen (nach Keywords/Kategorie gefiltert)
+- Der extrahierte Text wird als zusaetzlicher Kontext in den System-Prompt eingefuegt
+- So kann die KI auf das gespeicherte Fachwissen zugreifen
+
+### Edge Function: Wissensverarbeitung
+
+Neue Edge Function `process-knowledge` oder Erweiterung von `analyze-component`:
+- PDF: Text extrahieren und zusammenfassen
+- Bild: Inhalt beschreiben (Katalogseite, technische Zeichnung etc.)
+- Link: Seiteninhalt abrufen (via Fetch) und zusammenfassen
+- Ergebnis: `extracted_text` + `ai_summary` + `keywords[]` zurueck an Client
 
 ### Dateien
 
 | Aktion | Datei |
 |--------|------|
-| Modify | `src/pages/Loesung.tsx` -- Aktionsbuttons + Modellauswahl |
-| Modify | `src/components/ProviderSelect.tsx` -- Monica-Modell-Dropdown |
-| Create | `supabase/functions/generate-document/index.ts` -- PDF/DOCX/PPTX/XLSX Generierung |
-| Modify | `supabase/functions/generate-solutions/index.ts` -- Modellparameter akzeptieren |
-| Modify | `supabase/functions/generate-prompt/index.ts` -- Technischer Prompt fuer Dokumentation |
+| Migration | `knowledge_items` Tabelle + RLS |
+| Modify | `src/pages/Dashboard.tsx` -- Neuer "Wissen"-Bereich |
+| Create | `supabase/functions/process-knowledge/index.ts` -- KI-Analyse von Uploads |
+| Modify | `supabase/functions/generate-solutions/index.ts` -- Knowledge-Kontext laden |
 | Modify | `supabase/config.toml` -- neue Function registrieren |
 
-### Technische Details
+### Ablauf fuer den Nutzer
 
-**generate-document Edge Function:**
-- Akzeptiert: `{ loesung, format, provider, model }`
-- Fuer PDF/DOCX: Nutzt die KI um strukturierten Markdown zu generieren, konvertiert dann serverseitig
-- Fuer PPTX: Generiert JSON-Struktur der Slides via KI, baut PPTX
-- Fuer XLSX: Erstellt Komponentenliste als CSV/strukturiertes Format
-- Gibt Base64-encodierte Datei zurueck zum direkten Download
-
-**Detaillierte Fachanalyse:**
-- Neue Edge Function `generate-deep-analysis` oder Erweiterung von `generate-solutions` mit einem `mode: "deep"` Parameter
-- System-Prompt fordert: Festigkeitsberechnungen, Toleranzanalyse, Werkstoffdatenblaetter, relevante DIN/ISO Details
+1. Nutzer klickt "Wissen hinzufuegen" auf dem Dashboard
+2. Waehlt Dateityp (PDF/Bild/Link/Praesentation) und laedt hoch oder gibt URL ein
+3. Waehlt/erstellt Kategorie und gibt optionale Beschreibung ein
+4. KI analysiert den Inhalt automatisch und zeigt Zusammenfassung + vorgeschlagene Keywords
+5. Nutzer bestaetigt -- Eintrag wird in `knowledge_items` gespeichert
+6. Bei spaeteren Loesungsanfragen wird das gespeicherte Wissen automatisch als Kontext verwendet
 
