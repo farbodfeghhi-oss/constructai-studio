@@ -205,18 +205,19 @@ export default function PDFTranslate() {
         </CardContent>
       </Card>
 
-      {(extractedText || !fileName) && (
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Quelltext</CardTitle></CardHeader>
-          <CardContent>
-            <Textarea placeholder="Text aus PDF wird hier angezeigt, oder fügen Sie Text manuell ein…" rows={8} value={extractedText} onChange={(e) => setExtractedText(e.target.value)} className="font-mono text-sm" />
-            <Button onClick={translate} disabled={isLoading || !extractedText.trim()} className="mt-4 gap-2">
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
-              {isLoading ? "Übersetze…" : "Übersetzen"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Quelltext</CardTitle></CardHeader>
+        <CardContent>
+          {fileName && !extractedText.trim() && (
+            <p className="text-sm text-yellow-500 mb-3">⚠️ Kein Text aus dem PDF extrahiert. Das PDF könnte gescannt sein. Sie können den Text manuell einfügen.</p>
+          )}
+          <Textarea placeholder="Text aus PDF wird hier angezeigt, oder fügen Sie Text manuell ein…" rows={8} value={extractedText} onChange={(e) => setExtractedText(e.target.value)} className="font-mono text-sm" />
+          <Button onClick={translate} disabled={isLoading || !extractedText.trim()} className="mt-4 gap-2">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
+            {isLoading ? "Übersetze…" : "Übersetzen"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {isLoading && (
         <Card className="border-primary/20">
