@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { beschreibung, provider = "perplexity", images = [] } = await req.json();
+    const { beschreibung, provider = "perplexity", model, images = [] } = await req.json();
 
     if (!beschreibung?.trim()) {
       return new Response(JSON.stringify({ error: "Bitte geben Sie eine Beschreibung ein." }), {
@@ -75,7 +75,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: cfg.model,
+        model: model || cfg.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: images.length > 0 ? userContent : userText },
