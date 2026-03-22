@@ -52,7 +52,7 @@ export default function PDFTranslate() {
 
     try {
       const uint8Array = new Uint8Array(await file.arrayBuffer());
-      const text = extractTextFromPDF(uint8Array);
+      const text = await extractTextFromPDF(uint8Array);
       if (!text.trim()) {
         toast({ title: "Warnung", description: "Kein Text im PDF gefunden. Das PDF könnte gescannt sein.", variant: "destructive" });
       }
