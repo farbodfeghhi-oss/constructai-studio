@@ -259,7 +259,10 @@ export default function Dokumentation() {
   };
 
   const addBomRow = () => {
-    if (!newRow.name.trim()) return;
+    if (!newRow.name.trim()) {
+      toast({ title: "Bezeichnung erforderlich", description: "Bitte geben Sie eine Bezeichnung ein.", variant: "destructive" });
+      return;
+    }
     const row: BomRow = {
       id: Date.now().toString(), pos: bom.length + 1,
       name: newRow.name, norm: newRow.norm || "—", material: newRow.material || "—",
@@ -267,6 +270,7 @@ export default function Dokumentation() {
     };
     setBom((prev) => [...prev, row]);
     setNewRow({ name: "", norm: "", material: "", menge: "1", preis: "" });
+    toast({ title: "Hinzugefügt", description: `${row.name} wurde zur Stückliste hinzugefügt.` });
   };
 
   const removeBomRow = (id: string) => {
