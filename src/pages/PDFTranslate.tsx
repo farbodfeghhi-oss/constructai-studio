@@ -205,7 +205,7 @@ export default function PDFTranslate() {
         </CardContent>
       </Card>
 
-      {(extractedText || !fileName) && (
+      {(extractedText || !fileName || fileName) && (
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Quelltext</CardTitle></CardHeader>
           <CardContent>
