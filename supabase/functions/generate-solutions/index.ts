@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,7 +136,7 @@ serve(async (req) => {
   }
 
   try {
-    const { projektName, anforderungen, provider = "perplexity", model, images = [], mode = "solutions", loesung } = await req.json();
+    const { projektName, anforderungen, provider = "perplexity", model, images = [], mode = "solutions", loesung, userId } = await req.json();
 
     // Mode: deep-analysis
     if (mode === "deep-analysis" && loesung) {
@@ -226,6 +227,29 @@ serve(async (req) => {
 
     const selectedProvider = (provider as keyof typeof PROVIDERS) || "perplexity";
 
+    // Load knowledge context if user is authenticated
+    let knowledgeContext = "";
+    if (userId) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sb = createClient(supabaseUrl, supabaseKey);
+        const { data: knowledgeItems } = await sb
+          .from("knowledge_items")
+          .select("title, category, ai_summary, keywords, extracted_text")
+          .eq("user_id", userId)
+          .limit(20);
+        if (knowledgeItems && knowledgeItems.length > 0) {
+          const kTexts = knowledgeItems.map((k: any) =>
+            `- ${k.title} [${k.category}]: ${k.ai_summary || k.extracted_text || ""} (Keywords: ${(k.keywords || []).join(", ")})`
+          ).join("\n");
+          knowledgeContext = `\n\nDer Nutzer hat folgendes Fachwissen in seiner Wissensdatenbank gespeichert. Beruecksichtige dieses Wissen bei deinen Empfehlungen:\n${kTexts}`;
+        }
+      } catch (e) {
+        console.error("Knowledge loading error:", e);
+      }
+    }
+
     const userPrompt = projektName
       ? `Projekt: "${projektName}"\n\nAnforderungen:\n${anforderungen}`
       : anforderungen;
@@ -242,7 +266,7 @@ serve(async (req) => {
     userContent.push({ type: "text", text: userPrompt });
 
     const messages = [
-      { role: "system", content: SOLUTIONS_PROMPT },
+      { role: "system", content: SOLUTIONS_PROMPT + knowledgeContext },
       { role: "user", content: images.length > 0 ? userContent : userPrompt },
     ];
 
