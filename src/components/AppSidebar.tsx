@@ -1,4 +1,4 @@
-import { Home, Camera, Search, Settings, Sparkles, FileText, Plus, Languages } from "lucide-react";
+import { Home, Camera, Search, Settings, Sparkles, FileText, Plus, Languages, KeyRound } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -23,6 +23,7 @@ const navItems = [
   { title: "AI-Prompts", url: "/prompts", icon: Sparkles },
   { title: "PDF-Übersetzer", url: "/pdf-translate", icon: Languages },
   { title: "Dokumentation", url: "/dokumentation", icon: FileText },
+  { title: "API-Schlüssel", url: "/settings", icon: KeyRound },
 ];
 
 export function AppSidebar() {
