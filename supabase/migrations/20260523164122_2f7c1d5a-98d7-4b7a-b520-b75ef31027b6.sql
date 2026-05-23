@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Anyone can view component files" ON storage.objects;
