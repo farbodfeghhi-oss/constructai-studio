@@ -13,6 +13,7 @@ import Loesung from "./pages/Loesung";
 import Prompts from "./pages/Prompts";
 import Dokumentation from "./pages/Dokumentation";
 import PDFTranslate from "./pages/PDFTranslate";
+import SettingsPage from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
