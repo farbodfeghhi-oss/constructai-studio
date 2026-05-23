@@ -13,6 +13,7 @@ import Loesung from "./pages/Loesung";
 import Prompts from "./pages/Prompts";
 import Dokumentation from "./pages/Dokumentation";
 import PDFTranslate from "./pages/PDFTranslate";
+import SettingsPage from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -62,6 +63,7 @@ const App = () => (
                         <Route path="/loesung" element={<Loesung />} />
                         <Route path="/prompts" element={<Prompts />} />
                         <Route path="/pdf-translate" element={<PDFTranslate />} />
+                        <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/dokumentation" element={<Dokumentation />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
