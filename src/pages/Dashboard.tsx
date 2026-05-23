@@ -187,8 +187,15 @@ export default function Dashboard() {
           setSaving(false);
           return;
         }
-        const { data: urlData } = supabase.storage.from("component-files").getPublicUrl(path);
-        fileUrl = urlData.publicUrl;
+        const { data: signed, error: signErr } = await supabase.storage
+          .from("component-files")
+          .createSignedUrl(path, 60 * 60 * 24 * 365);
+        if (signErr) {
+          toast({ title: "Datei-Link konnte nicht erstellt werden", description: signErr.message, variant: "destructive" });
+          setSaving(false);
+          return;
+        }
+        fileUrl = signed.signedUrl;
       }
 
       const { error } = await supabase.from("knowledge_items").insert({
