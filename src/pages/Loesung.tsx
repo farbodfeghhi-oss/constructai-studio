@@ -134,11 +134,39 @@ function PromptCopyCard({ label, prompt }: { label: string; prompt: string }) {
   );
 }
 
+type PicsartDocType = "zeichnung" | "stueckliste" | "montage" | "praesentation";
+interface PicsartDoc { imageUrl: string; prompt: string; label: string; docType: PicsartDocType; }
+
+const PICSART_DOCS: { type: PicsartDocType; label: string; emoji: string }[] = [
+  { type: "zeichnung", label: "Technische Zeichnung", emoji: "📐" },
+  { type: "stueckliste", label: "Stückliste", emoji: "📋" },
+  { type: "montage", label: "Montageanleitung", emoji: "🔧" },
+  { type: "praesentation", label: "Präsentation", emoji: "📊" },
+];
+
 function SolutionActions({ loesung, provider, model, projektName }: { loesung: Loesung; provider: AIProvider; model?: MonicaModel; projektName?: string }) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [deepAnalysis, setDeepAnalysis] = useState<DeepAnalysis | null>(null);
   const [techPrompts, setTechPrompts] = useState<TechnicalPrompts | null>(null);
   const [exportFormat, setExportFormat] = useState("pdf");
+  const [picsartDocs, setPicsartDocs] = useState<PicsartDoc[]>([]);
+
+  const generatePicsartDoc = async (docType: PicsartDocType) => {
+    setLoadingAction(`picsart-${docType}`);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-picsart-doc", {
+        body: { loesung, docType },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setPicsartDocs((prev) => [...prev.filter((d) => d.docType !== docType), data as PicsartDoc]);
+      toast({ title: "Picsart fertig", description: `${data.label} wurde generiert.` });
+    } catch (err: any) {
+      toast({ title: "Picsart Fehler", description: err.message || "Bild-Generierung fehlgeschlagen", variant: "destructive" });
+    } finally {
+      setLoadingAction(null);
+    }
+  };
 
   const runDeepAnalysis = async () => {
     setLoadingAction("deep");
