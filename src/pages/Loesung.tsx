@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, FileText, Search, Wand2, Download, Copy, Check } from "lucide-react";
+import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, FileText, Search, Wand2, Download, Copy, Check, Image as ImageIcon } from "lucide-react";
 import { ProviderSelect, type AIProvider, type MonicaModel } from "@/components/ProviderSelect";
 import { RichMediaInput } from "@/components/RichMediaInput";
 import { type Attachment } from "@/components/AttachmentPreview";
@@ -134,11 +134,39 @@ function PromptCopyCard({ label, prompt }: { label: string; prompt: string }) {
   );
 }
 
+type PicsartDocType = "zeichnung" | "stueckliste" | "montage" | "praesentation";
+interface PicsartDoc { imageUrl: string; prompt: string; label: string; docType: PicsartDocType; }
+
+const PICSART_DOCS: { type: PicsartDocType; label: string; emoji: string }[] = [
+  { type: "zeichnung", label: "Technische Zeichnung", emoji: "📐" },
+  { type: "stueckliste", label: "Stückliste", emoji: "📋" },
+  { type: "montage", label: "Montageanleitung", emoji: "🔧" },
+  { type: "praesentation", label: "Präsentation", emoji: "📊" },
+];
+
 function SolutionActions({ loesung, provider, model, projektName }: { loesung: Loesung; provider: AIProvider; model?: MonicaModel; projektName?: string }) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [deepAnalysis, setDeepAnalysis] = useState<DeepAnalysis | null>(null);
   const [techPrompts, setTechPrompts] = useState<TechnicalPrompts | null>(null);
   const [exportFormat, setExportFormat] = useState("pdf");
+  const [picsartDocs, setPicsartDocs] = useState<PicsartDoc[]>([]);
+
+  const generatePicsartDoc = async (docType: PicsartDocType) => {
+    setLoadingAction(`picsart-${docType}`);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-picsart-doc", {
+        body: { loesung, docType },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setPicsartDocs((prev) => [...prev.filter((d) => d.docType !== docType), data as PicsartDoc]);
+      toast({ title: "Picsart fertig", description: `${data.label} wurde generiert.` });
+    } catch (err: any) {
+      toast({ title: "Picsart Fehler", description: err.message || "Bild-Generierung fehlgeschlagen", variant: "destructive" });
+    } finally {
+      setLoadingAction(null);
+    }
+  };
 
   const runDeepAnalysis = async () => {
     setLoadingAction("deep");
@@ -262,6 +290,61 @@ function SolutionActions({ loesung, provider, model, projektName }: { loesung: L
           )}
         </div>
       )}
+
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-primary" />
+            Picsart Technische Dokumentation
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Jedes Dokument wird mit einem fachlichen Prompt (DIN/ISO, Maschinenbau) an den Picsart Agent gesendet und als Bild generiert.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {PICSART_DOCS.map((d) => {
+              const isLoading = loadingAction === `picsart-${d.type}`;
+              return (
+                <Button
+                  key={d.type}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => generatePicsartDoc(d.type)}
+                  disabled={!!loadingAction}
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>{d.emoji}</span>}
+                  {d.label}
+                </Button>
+              );
+            })}
+          </div>
+
+          {picsartDocs.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              {picsartDocs.map((doc) => (
+                <Card key={doc.docType} className="overflow-hidden">
+                  <div className="bg-muted aspect-square flex items-center justify-center">
+                    <img src={doc.imageUrl} alt={doc.label} className="w-full h-full object-contain" />
+                  </div>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{doc.label}</p>
+                      <a href={doc.imageUrl} target="_blank" rel="noopener noreferrer" download>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Download className="h-3.5 w-3.5" />
+                        </Button>
+                      </a>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground line-clamp-2 font-mono">{doc.prompt}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
