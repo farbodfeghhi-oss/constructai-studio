@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, FileText, Search, Wand2, Download, Copy, Check } from "lucide-react";
+import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, FileText, Search, Wand2, Download, Copy, Check, Image as ImageIcon } from "lucide-react";
 import { ProviderSelect, type AIProvider, type MonicaModel } from "@/components/ProviderSelect";
 import { RichMediaInput } from "@/components/RichMediaInput";
 import { type Attachment } from "@/components/AttachmentPreview";
