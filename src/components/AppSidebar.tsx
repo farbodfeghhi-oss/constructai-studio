@@ -1,6 +1,6 @@
-import { Home, Camera, Search, Settings, Sparkles, FileText, Plus, Languages, KeyRound } from "lucide-react";
+import { Home, Settings, FileText, Plus, KeyRound } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -17,11 +17,7 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: Home },
-  { title: "Bild-Analyse", url: "/analyse", icon: Camera },
-  { title: "Komponenten-Suche", url: "/komponenten", icon: Search },
   { title: "Lösungsvorschläge", url: "/loesung", icon: Settings },
-  { title: "AI-Prompts", url: "/prompts", icon: Sparkles },
-  { title: "PDF-Übersetzer", url: "/pdf-translate", icon: Languages },
   { title: "Wissensbasis", url: "/dokumentation", icon: FileText },
   { title: "API-Schlüssel", url: "/settings", icon: KeyRound },
 ];
@@ -30,6 +26,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -83,12 +80,12 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-3">
         {!collapsed ? (
-          <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold gap-2">
+          <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold gap-2" onClick={() => navigate("/")}>
             <Plus className="h-4 w-4" />
-            Neue Analyse
+            Neues Projekt
           </Button>
         ) : (
-          <Button size="icon" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" aria-label="Neue Analyse">
+          <Button size="icon" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" aria-label="Neues Projekt" onClick={() => navigate("/")}>
             <Plus className="h-4 w-4" />
           </Button>
         )}

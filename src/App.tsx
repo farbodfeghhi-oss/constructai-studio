@@ -7,12 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/components/AuthProvider";
 import { AppLayout } from "@/components/AppLayout";
 import Dashboard from "./pages/Dashboard";
-import Analyse from "./pages/Analyse";
-import Komponenten from "./pages/Komponenten";
 import Loesung from "./pages/Loesung";
-import Prompts from "./pages/Prompts";
 import Dokumentation from "./pages/Dokumentation";
-import PDFTranslate from "./pages/PDFTranslate";
 import SettingsPage from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -58,11 +54,7 @@ const App = () => (
                     <AppLayout>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
-                        <Route path="/analyse" element={<Analyse />} />
-                        <Route path="/komponenten" element={<Komponenten />} />
                         <Route path="/loesung" element={<Loesung />} />
-                        <Route path="/prompts" element={<Prompts />} />
-                        <Route path="/pdf-translate" element={<PDFTranslate />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/dokumentation" element={<Dokumentation />} />
                         <Route path="*" element={<NotFound />} />
