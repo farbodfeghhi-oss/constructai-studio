@@ -22,7 +22,7 @@ const navItems = [
   { title: "Lösungsvorschläge", url: "/loesung", icon: Settings },
   { title: "AI-Prompts", url: "/prompts", icon: Sparkles },
   { title: "PDF-Übersetzer", url: "/pdf-translate", icon: Languages },
-  { title: "Dokumentation", url: "/dokumentation", icon: FileText },
+  { title: "Wissensbasis", url: "/dokumentation", icon: FileText },
   { title: "API-Schlüssel", url: "/settings", icon: KeyRound },
 ];
 
