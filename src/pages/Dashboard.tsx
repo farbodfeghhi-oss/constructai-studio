@@ -266,9 +266,9 @@ export default function Dashboard() {
       {/* Hero Upload Card */}
       <Card className="border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5">
         <CardHeader>
-          <CardTitle asChild className="text-2xl">
-            <h1>Willkommen bei <span className="text-primary">MechAI</span></h1>
-          </CardTitle>
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">
+            Willkommen bei <span className="text-primary">MechAI</span>
+          </h1>
           <CardDescription className="text-base">
             Laden Sie ein technisches Bild hoch oder beschreiben Sie Ihr Projekt
           </CardDescription>

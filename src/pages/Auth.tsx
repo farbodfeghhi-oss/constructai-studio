@@ -85,9 +85,9 @@ export default function Auth() {
               <Settings className="h-6 w-6 text-accent-foreground" />
             </div>
           </div>
-          <CardTitle asChild className="text-xl">
-            <h1>{showForgot ? "Passwort zurücksetzen" : isLogin ? "Bei MechAI anmelden" : "MechAI-Konto erstellen"}</h1>
-          </CardTitle>
+          <h1 className="text-xl font-semibold leading-none tracking-tight">
+            {showForgot ? "Passwort zurücksetzen" : isLogin ? "Bei MechAI anmelden" : "MechAI-Konto erstellen"}
+          </h1>
           <CardDescription>
             {showForgot
               ? "Geben Sie Ihre E-Mail ein, um einen Reset-Link zu erhalten."
