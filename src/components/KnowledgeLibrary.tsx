@@ -363,11 +363,12 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
           </div>
 
           <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
-            <TabsList className="grid grid-cols-4 w-full">
+            <TabsList className="grid grid-cols-5 w-full">
               <TabsTrigger value="pdf" className="text-xs gap-1.5"><FileText className="h-3.5 w-3.5" />PDF</TabsTrigger>
               <TabsTrigger value="image" className="text-xs gap-1.5"><ImageIcon className="h-3.5 w-3.5" />Bild</TabsTrigger>
               <TabsTrigger value="url" className="text-xs gap-1.5"><Link2 className="h-3.5 w-3.5" />URL</TabsTrigger>
               <TabsTrigger value="text" className="text-xs gap-1.5"><Type className="h-3.5 w-3.5" />Text</TabsTrigger>
+              <TabsTrigger value="drive" className="text-xs gap-1.5"><HardDrive className="h-3.5 w-3.5" />Drive</TabsTrigger>
             </TabsList>
 
             <TabsContent value="pdf" className="mt-3">
