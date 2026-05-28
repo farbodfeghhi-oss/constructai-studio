@@ -18,12 +18,10 @@ import * as pdfjsLib from "pdfjs-dist";
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).href;
 
 const quickActions = [
-  { title: "Normteil-Suche", desc: "DIN/ISO Standardteile finden", icon: Search, route: "/komponenten" },
   { title: "Material-Beratung", desc: "Werkstoff-Empfehlungen", icon: Layers, route: "/loesung" },
   { title: "Solid Edge Tipps", desc: "CAD Best-Practices", icon: PenTool, route: "/dokumentation" },
   { title: "DIN/ISO Normen", desc: "Normen nachschlagen", icon: BookOpen, route: "/dokumentation" },
   { title: "Blech-Design", desc: "Sheet Metal Workflow", icon: PenTool, route: "/loesung" },
-  { title: "Stückliste erstellen", desc: "BOM generieren", icon: ClipboardList, route: "/dokumentation" },
 ];
 
 const recentProjects = [
@@ -250,7 +248,7 @@ export default function Dashboard() {
       fromDashboard: true,
       dashboardDraft: { description: beschreibung, attachments },
     };
-    navigate(beschreibung.trim() ? "/loesung" : "/analyse", { state: nextState });
+    navigate("/loesung", { state: nextState });
   };
 
   const filteredKnowledge = knowledgeItems.filter(
@@ -279,7 +277,7 @@ export default function Dashboard() {
               <Upload className="h-5 w-5 mt-0.5 text-primary" />
               <div>
                 <p className="font-medium text-foreground">Projektbeschreibung und Bilder direkt hier vorbereiten</p>
-                <p>Mit Beschreibung geht es weiter zu Lösungsvorschlägen, ohne Beschreibung direkt zur Bild-Analyse.</p>
+                <p>Mit Beschreibung und/oder Bildern geht es weiter zu den Lösungsvorschlägen.</p>
               </div>
             </div>
             <RichMediaInput
@@ -314,7 +312,7 @@ export default function Dashboard() {
               onClick={weiterZumPassendenBereich}
               disabled={!beschreibung.trim() && attachments.length === 0}
             >
-              {beschreibung.trim() ? "Mit Beschreibung weiter" : "Zur Bild-Analyse"}
+              Zu den Lösungsvorschlägen
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
