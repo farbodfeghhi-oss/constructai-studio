@@ -28,7 +28,7 @@ const PROVIDER_CONFIGS: Record<string, { url: string; envName: string; model: st
   gemini: {
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     envName: "GEMINI_API_KEY",
-    model: "gemini-2.5-pro",
+    model: "gemini-2.5-flash",
     auth: "bearer",
   },
   groq: {
@@ -69,9 +69,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Native Gemini API path — tries best-to-cheapest models to find one available on the user's account
+    // Native Gemini API path — free-tier friendly: skip Pro and prefer Flash models.
     if (provider === "gemini") {
-      const candidates = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
+      const candidates = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
       const startTime = Date.now();
       let lastErr = "Unbekannter Fehler";
       let lastStatus = 0;
