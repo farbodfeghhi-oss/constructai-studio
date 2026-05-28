@@ -26,7 +26,7 @@ const ACTIVE_PROVIDERS: Provider[] = [
 const OPTIONAL_PROVIDERS: Provider[] = [
   { id: "openai", name: "OpenAI", envName: "OPENAI_API_KEY", description: "GPT-4o, GPT-4 Turbo, o1 Modelle direkt.", helpUrl: "https://platform.openai.com/api-keys", color: "text-foreground" },
   { id: "anthropic", name: "Anthropic Claude", envName: "ANTHROPIC_API_KEY", description: "Claude Sonnet & Opus direkt von Anthropic.", helpUrl: "https://console.anthropic.com/settings/keys", color: "text-foreground" },
-  { id: "gemini", name: "Google Gemini", envName: "GEMINI_API_KEY", description: "Gemini 2.0/2.5 Pro & Flash mit Vision.", helpUrl: "https://aistudio.google.com/apikey", color: "text-foreground" },
+  { id: "gemini", name: "Google Gemini", envName: "GEMINI_API_KEY", description: "Kostenlose Nutzung: Flash-Modelle ohne Pro-Quota.", helpUrl: "https://aistudio.google.com/apikey", color: "text-foreground" },
   { id: "groq", name: "Groq", envName: "GROQ_API_KEY", description: "Extrem schnelle Inferenz für Llama & Mixtral.", helpUrl: "https://console.groq.com/keys", color: "text-foreground" },
   { id: "deepseek", name: "DeepSeek", envName: "DEEPSEEK_API_KEY", description: "DeepSeek V3 & R1 (Reasoning) direkt.", helpUrl: "https://platform.deepseek.com/api_keys", color: "text-foreground" },
 ];
