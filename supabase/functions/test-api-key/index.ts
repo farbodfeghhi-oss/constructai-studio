@@ -28,7 +28,7 @@ const PROVIDER_CONFIGS: Record<string, { url: string; envName: string; model: st
   gemini: {
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     envName: "GEMINI_API_KEY",
-    model: "gemini-2.0-flash-exp",
+    model: "gemini-2.5-pro",
     auth: "bearer",
   },
   groq: {
