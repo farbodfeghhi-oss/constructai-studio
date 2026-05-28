@@ -14,6 +14,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import AdvancedEngineeringAnalysis from "./pages/AdvancedEngineeringAnalysis";
+import AiRoles from "./pages/AiRoles";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ const App = () => (
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/dokumentation" element={<Dokumentation />} />
                         <Route path="/advanced-engineering-analysis" element={<AdvancedEngineeringAnalysis />} />
+                        <Route path="/ai-roles" element={<AiRoles />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </AppLayout>

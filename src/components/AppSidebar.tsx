@@ -1,4 +1,4 @@
-import { Home, Settings, FileText, Plus, KeyRound, Sparkles } from "lucide-react";
+import { Home, Settings, FileText, Plus, KeyRound, Sparkles, Shield } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -20,6 +20,7 @@ const navItems = [
   { title: "Lösungsvorschläge", url: "/loesung", icon: Settings },
   { title: "Advanced Analysis", url: "/advanced-engineering-analysis", icon: Sparkles },
   { title: "Wissensbasis", url: "/dokumentation", icon: FileText },
+  { title: "AI Rollen", url: "/ai-roles", icon: Shield },
   { title: "API-Schlüssel", url: "/settings", icon: KeyRound },
 ];
 
