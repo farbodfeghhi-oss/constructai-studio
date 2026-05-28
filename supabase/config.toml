@@ -32,3 +32,15 @@ verify_jwt = false
 
 [functions.advanced-analysis-retry]
 verify_jwt = false
+
+[functions.verify-admin-pass]
+verify_jwt = false
+
+[functions.update-active-role]
+verify_jwt = false
+
+[functions.update-role-prompt]
+verify_jwt = false
+
+[functions.dashboard-assets]
+verify_jwt = false
