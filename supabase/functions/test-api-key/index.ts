@@ -69,6 +69,45 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Native Gemini API path — tries best-to-cheapest models to find one available on the user's account
+    if (provider === "gemini") {
+      const candidates = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
+      const startTime = Date.now();
+      let lastErr = "Unbekannter Fehler";
+      let lastStatus = 0;
+      for (const model of candidates) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: "test" }] }],
+            generationConfig: { maxOutputTokens: 16, temperature: 0 },
+          }),
+        });
+        const txt = await r.text();
+        if (r.ok) {
+          return new Response(
+            JSON.stringify({ ok: true, configured: true, latency: Date.now() - startTime, status: r.status, model }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        lastStatus = r.status;
+        try {
+          const j = JSON.parse(txt);
+          lastErr = j.error?.message || txt.slice(0, 250);
+        } catch {
+          lastErr = txt.slice(0, 250) || `HTTP ${r.status}`;
+        }
+        // 400 / 404 = model not available for this key — try next; other errors are key-related, stop
+        if (r.status !== 400 && r.status !== 404) break;
+      }
+      return new Response(
+        JSON.stringify({ ok: false, configured: true, status: lastStatus, error: lastErr, latency: Date.now() - startTime }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (config.auth === "bearer") headers["Authorization"] = `Bearer ${apiKey}`;
     else if (config.auth === "x-api-key") {
