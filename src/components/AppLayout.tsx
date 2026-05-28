@@ -25,7 +25,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </span>
               )}
               <ThemeToggle />
-              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={signOut}>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={signOut} aria-label="Abmelden">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>

@@ -266,9 +266,9 @@ export default function Dashboard() {
       {/* Hero Upload Card */}
       <Card className="border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5">
         <CardHeader>
-          <CardTitle className="text-2xl">
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">
             Willkommen bei <span className="text-primary">MechAI</span>
-          </CardTitle>
+          </h1>
           <CardDescription className="text-base">
             Laden Sie ein technisches Bild hoch oder beschreiben Sie Ihr Projekt
           </CardDescription>
@@ -386,6 +386,7 @@ export default function Dashboard() {
                       size="icon"
                       className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                       onClick={() => deleteKnowledgeItem(item.id)}
+                      aria-label={`Eintrag „${item.title}“ löschen`}
                     >
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
