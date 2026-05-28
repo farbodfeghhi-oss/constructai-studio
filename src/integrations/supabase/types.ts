@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_runs: {
+        Row: {
+          created_at: string
+          current_phase: string
+          error: string | null
+          file_paths: string[]
+          gemini_blueprint: Json | null
+          id: string
+          monica_report: string | null
+          perplexity_validation: Json | null
+          phase_status: Json
+          prompt: string
+          reference_ids: string[]
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_phase?: string
+          error?: string | null
+          file_paths?: string[]
+          gemini_blueprint?: Json | null
+          id?: string
+          monica_report?: string | null
+          perplexity_validation?: Json | null
+          phase_status?: Json
+          prompt: string
+          reference_ids?: string[]
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_phase?: string
+          error?: string | null
+          file_paths?: string[]
+          gemini_blueprint?: Json | null
+          id?: string
+          monica_report?: string | null
+          perplexity_validation?: Json | null
+          phase_status?: Json
+          prompt?: string
+          reference_ids?: string[]
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       components: {
         Row: {
           category: string | null
