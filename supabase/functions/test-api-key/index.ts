@@ -76,9 +76,13 @@ Deno.serve(async (req) => {
       headers["anthropic-version"] = "2023-06-01";
     }
 
-    const body = provider === "anthropic"
-      ? JSON.stringify({ model: config.model, max_tokens: 10, messages: [{ role: "user", content: "test" }] })
-      : JSON.stringify({ model: config.model, max_tokens: 10, messages: [{ role: "user", content: "test" }] });
+    // Perplexity sonar requires max_tokens >= 16
+    const maxTokens = provider === "perplexity" ? 16 : 10;
+    const body = JSON.stringify({
+      model: config.model,
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: "test" }],
+    });
 
     const startTime = Date.now();
     const response = await fetch(config.url, { method: "POST", headers, body });
