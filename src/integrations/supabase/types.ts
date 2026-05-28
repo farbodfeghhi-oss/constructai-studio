@@ -81,12 +81,17 @@ export type Database = {
           content_type: string
           created_at: string
           description: string | null
+          domain: string | null
           extracted_text: string | null
           file_url: string | null
           id: string
+          is_active: boolean
           keywords: string[] | null
           link_url: string | null
+          scope: string
+          source_name: string | null
           title: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -95,12 +100,17 @@ export type Database = {
           content_type?: string
           created_at?: string
           description?: string | null
+          domain?: string | null
           extracted_text?: string | null
           file_url?: string | null
           id?: string
+          is_active?: boolean
           keywords?: string[] | null
           link_url?: string | null
+          scope?: string
+          source_name?: string | null
           title: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -109,12 +119,17 @@ export type Database = {
           content_type?: string
           created_at?: string
           description?: string | null
+          domain?: string | null
           extracted_text?: string | null
           file_url?: string | null
           id?: string
+          is_active?: boolean
           keywords?: string[] | null
           link_url?: string | null
+          scope?: string
+          source_name?: string | null
           title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
