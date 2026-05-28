@@ -1,0 +1,9 @@
+# MechAI
+
+> KI-Engineering-Plattform für Maschinenbau: Bild-Analyse, Normteil-Suche (DIN/ISO/EN), Lösungsvorschläge, PDF-Übersetzung und technische Dokumentation.
+
+MechAI unterstützt Konstrukteure und Ingenieure bei Recherche, Auswahl von Normteilen, Materialberatung, Blech-Design und der Erstellung technischer Dokumente. Die Plattform ist passwortgeschützt; öffentliche Inhalte beschränken sich auf die Startseite.
+
+## Pages
+
+- [Startseite](/): Überblick über MechAI und Einstieg in die Plattform.

@@ -88,7 +88,7 @@ export function AppSidebar() {
             Neue Analyse
           </Button>
         ) : (
-          <Button size="icon" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button size="icon" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" aria-label="Neue Analyse">
             <Plus className="h-4 w-4" />
           </Button>
         )}

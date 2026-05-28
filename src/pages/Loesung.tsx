@@ -332,7 +332,7 @@ function SolutionActions({ loesung, provider, model, projektName }: { loesung: L
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium">{doc.label}</p>
                       <a href={doc.imageUrl} target="_blank" rel="noopener noreferrer" download>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`${doc.label} herunterladen`}>
                           <Download className="h-3.5 w-3.5" />
                         </Button>
                       </a>
@@ -451,7 +451,7 @@ function SolutionHistory({ history, onSelect, onDelete }: {
                 {s.provider && ` · ${s.provider}`}
               </p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(s.id); }}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} aria-label="Lösung löschen">
               <Trash2 className="h-4 w-4" />
             </Button>
           </CardContent>

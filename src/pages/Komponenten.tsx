@@ -296,7 +296,12 @@ export default function Komponenten() {
                     filtered.map((k) => (
                       <TableRow key={k.id} className="group">
                         <TableCell>
-                          <button onClick={() => toggleFav(k.id)} className="p-1 rounded hover:bg-muted transition-colors">
+                          <button
+                            onClick={() => toggleFav(k.id)}
+                            className="p-1 rounded hover:bg-muted transition-colors"
+                            aria-label={favorites.has(k.id) ? `${k.name} aus Favoriten entfernen` : `${k.name} zu Favoriten hinzufügen`}
+                            aria-pressed={favorites.has(k.id)}
+                          >
                             <Star className={`h-4 w-4 ${favorites.has(k.id) ? "fill-accent text-accent" : "text-muted-foreground/40 group-hover:text-muted-foreground"}`} />
                           </button>
                         </TableCell>
