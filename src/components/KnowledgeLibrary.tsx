@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import {
   Upload, Search, Trash2, Loader2, FileText, Image as ImageIcon,
-  Link2, Type, Sparkles, X,
+  Link2, Type, Sparkles, X, HardDrive, RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -74,13 +74,17 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"pdf" | "image" | "url" | "text">("pdf");
+  const [mode, setMode] = useState<"pdf" | "image" | "url" | "text" | "drive">("pdf");
   const [linkUrl, setLinkUrl] = useState("");
   const [rawText, setRawText] = useState("");
   const [textTitle, setTextTitle] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
+  const [driveQuery, setDriveQuery] = useState("");
+  const [driveFiles, setDriveFiles] = useState<Array<{ id: string; name: string; mimeType: string; modifiedTime?: string }>>([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveLoaded, setDriveLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
