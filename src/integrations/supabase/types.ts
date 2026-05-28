@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_role_plans: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          is_builtin: boolean
+          key: string
+          models: Json
+          name: string
+          provider_mode: string
+          system_prompt: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          is_active?: boolean
+          is_builtin?: boolean
+          key: string
+          models?: Json
+          name: string
+          provider_mode: string
+          system_prompt: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          is_builtin?: boolean
+          key?: string
+          models?: Json
+          name?: string
+          provider_mode?: string
+          system_prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       analysis_runs: {
         Row: {
           created_at: string
@@ -62,6 +104,24 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }
@@ -121,6 +181,33 @@ export type Database = {
           supplier?: string | null
           updated_at?: string
           url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      dashboard_assets: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          key: string
+          prompt: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          key: string
+          prompt?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          key?: string
+          prompt?: string | null
           user_id?: string
         }
         Relationships: []
@@ -250,7 +337,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      verify_admin_password: { Args: { p: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
