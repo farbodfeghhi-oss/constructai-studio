@@ -445,6 +445,46 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
                 <Sparkles className="h-4 w-4" /> Text analysieren & speichern
               </Button>
             </TabsContent>
+
+            <TabsContent value="drive" className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="In Google Drive suchen (Dateiname)…"
+                  value={driveQuery}
+                  onChange={(e) => setDriveQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") loadDriveFiles(); }}
+                  disabled={driveLoading || processing}
+                />
+                <Button onClick={loadDriveFiles} disabled={driveLoading || processing} className="gap-1.5">
+                  {driveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  {driveLoaded ? "Aktualisieren" : "Laden"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Es werden nur PDFs und Bilder aus deinem Google Drive angezeigt.</p>
+              <div className="max-h-72 overflow-auto border rounded-md divide-y">
+                {!driveLoaded && !driveLoading && (
+                  <div className="p-4 text-xs text-muted-foreground text-center">Klicke „Laden", um Dateien aus deinem Google Drive zu sehen.</div>
+                )}
+                {driveLoaded && driveFiles.length === 0 && !driveLoading && (
+                  <div className="p-4 text-xs text-muted-foreground text-center">Keine passenden Dateien gefunden.</div>
+                )}
+                {driveFiles.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => importFromDrive(f)}
+                    disabled={processing}
+                    className="w-full flex items-center gap-2 p-2 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+                  >
+                    {f.mimeType === "application/pdf"
+                      ? <FileText className="h-4 w-4 text-primary shrink-0" />
+                      : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
+                    <span className="text-xs truncate flex-1">{f.name}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase">{f.mimeType.split("/")[1]}</span>
+                  </button>
+                ))}
+              </div>
+            </TabsContent>
           </Tabs>
 
           {processing && (
