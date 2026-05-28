@@ -263,6 +263,61 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
       toast({ title: "Fehler", description: e.message || "Verarbeitung fehlgeschlagen", variant: "destructive" });
     } finally {
       setTimeout(() => { setProcessing(false); setProgress(0); setProgressLabel(""); }, 600);
+  }
+
+  async function loadDriveFiles() {
+    setDriveLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gdrive-browse", {
+        body: { action: "list", query: driveQuery.trim() },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      setDriveFiles(data?.files ?? []);
+      setDriveLoaded(true);
+    } catch (e: any) {
+      toast({ title: "Google Drive Fehler", description: e.message || "Konnte Dateien nicht laden", variant: "destructive" });
+    } finally {
+      setDriveLoading(false);
+    }
+  }
+
+  function base64ToFile(base64: string, name: string, mimeType: string): File {
+    const bin = atob(base64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new File([arr], name, { type: mimeType });
+  }
+
+  async function importFromDrive(file: { id: string; name: string; mimeType: string }) {
+    if (!user || processing) return;
+    setProcessing(true);
+    try {
+      setProgressLabel(`Lade „${file.name}" von Google Drive…`);
+      setProgress(15);
+      const { data, error } = await supabase.functions.invoke("gdrive-browse", {
+        body: { action: "download", fileId: file.id },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      const realFile = base64ToFile(data.base64, data.name, data.mimeType);
+      setProcessing(false);
+      setProgress(0);
+      setProgressLabel("");
+
+      if (data.mimeType === "application/pdf") {
+        await handlePdf(realFile);
+      } else if (data.mimeType?.startsWith("image/")) {
+        await handleImage(realFile);
+      } else {
+        throw new Error(`Dateityp ${data.mimeType} wird nicht unterstützt`);
+      }
+    } catch (e: any) {
+      toast({ title: "Drive-Import fehlgeschlagen", description: e.message, variant: "destructive" });
+      setProcessing(false);
+      setProgress(0);
+      setProgressLabel("");
     }
   }
 
