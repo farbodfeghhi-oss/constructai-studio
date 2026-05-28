@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import {
   Upload, Search, Trash2, Loader2, FileText, Image as ImageIcon,
-  Link2, Type, Sparkles, X,
+  Link2, Type, Sparkles, X, HardDrive, RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -74,13 +74,17 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"pdf" | "image" | "url" | "text">("pdf");
+  const [mode, setMode] = useState<"pdf" | "image" | "url" | "text" | "drive">("pdf");
   const [linkUrl, setLinkUrl] = useState("");
   const [rawText, setRawText] = useState("");
   const [textTitle, setTextTitle] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
+  const [driveQuery, setDriveQuery] = useState("");
+  const [driveFiles, setDriveFiles] = useState<Array<{ id: string; name: string; mimeType: string; modifiedTime?: string }>>([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveLoaded, setDriveLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -262,6 +266,62 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
     }
   }
 
+  async function loadDriveFiles() {
+    setDriveLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gdrive-browse", {
+        body: { action: "list", query: driveQuery.trim() },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      setDriveFiles(data?.files ?? []);
+      setDriveLoaded(true);
+    } catch (e: any) {
+      toast({ title: "Google Drive Fehler", description: e.message || "Konnte Dateien nicht laden", variant: "destructive" });
+    } finally {
+      setDriveLoading(false);
+    }
+  }
+
+  function base64ToFile(base64: string, name: string, mimeType: string): File {
+    const bin = atob(base64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new File([arr], name, { type: mimeType });
+  }
+
+  async function importFromDrive(file: { id: string; name: string; mimeType: string }) {
+    if (!user || processing) return;
+    setProcessing(true);
+    try {
+      setProgressLabel(`Lade „${file.name}" von Google Drive…`);
+      setProgress(15);
+      const { data, error } = await supabase.functions.invoke("gdrive-browse", {
+        body: { action: "download", fileId: file.id },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      const realFile = base64ToFile(data.base64, data.name, data.mimeType);
+      setProcessing(false);
+      setProgress(0);
+      setProgressLabel("");
+
+      if (data.mimeType === "application/pdf") {
+        await handlePdf(realFile);
+      } else if (data.mimeType?.startsWith("image/")) {
+        await handleImage(realFile);
+      } else {
+        throw new Error(`Dateityp ${data.mimeType} wird nicht unterstützt`);
+      }
+    } catch (e: any) {
+      toast({ title: "Drive-Import fehlgeschlagen", description: e.message, variant: "destructive" });
+      setProcessing(false);
+      setProgress(0);
+      setProgressLabel("");
+    }
+  }
+
   async function toggleActive(item: KnowledgeItem, next: boolean) {
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_active: next } : i)));
     const { error } = await supabase.from("knowledge_items").update({ is_active: next }).eq("id", item.id);
@@ -303,11 +363,12 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
           </div>
 
           <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
-            <TabsList className="grid grid-cols-4 w-full">
+            <TabsList className="grid grid-cols-5 w-full">
               <TabsTrigger value="pdf" className="text-xs gap-1.5"><FileText className="h-3.5 w-3.5" />PDF</TabsTrigger>
               <TabsTrigger value="image" className="text-xs gap-1.5"><ImageIcon className="h-3.5 w-3.5" />Bild</TabsTrigger>
               <TabsTrigger value="url" className="text-xs gap-1.5"><Link2 className="h-3.5 w-3.5" />URL</TabsTrigger>
               <TabsTrigger value="text" className="text-xs gap-1.5"><Type className="h-3.5 w-3.5" />Text</TabsTrigger>
+              <TabsTrigger value="drive" className="text-xs gap-1.5"><HardDrive className="h-3.5 w-3.5" />Drive</TabsTrigger>
             </TabsList>
 
             <TabsContent value="pdf" className="mt-3">
@@ -383,6 +444,46 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
               <Button className="w-full gap-2" disabled={processing || !rawText.trim()} onClick={handleText}>
                 <Sparkles className="h-4 w-4" /> Text analysieren & speichern
               </Button>
+            </TabsContent>
+
+            <TabsContent value="drive" className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="In Google Drive suchen (Dateiname)…"
+                  value={driveQuery}
+                  onChange={(e) => setDriveQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") loadDriveFiles(); }}
+                  disabled={driveLoading || processing}
+                />
+                <Button onClick={loadDriveFiles} disabled={driveLoading || processing} className="gap-1.5">
+                  {driveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  {driveLoaded ? "Aktualisieren" : "Laden"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Es werden nur PDFs und Bilder aus deinem Google Drive angezeigt.</p>
+              <div className="max-h-72 overflow-auto border rounded-md divide-y">
+                {!driveLoaded && !driveLoading && (
+                  <div className="p-4 text-xs text-muted-foreground text-center">Klicke „Laden", um Dateien aus deinem Google Drive zu sehen.</div>
+                )}
+                {driveLoaded && driveFiles.length === 0 && !driveLoading && (
+                  <div className="p-4 text-xs text-muted-foreground text-center">Keine passenden Dateien gefunden.</div>
+                )}
+                {driveFiles.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => importFromDrive(f)}
+                    disabled={processing}
+                    className="w-full flex items-center gap-2 p-2 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+                  >
+                    {f.mimeType === "application/pdf"
+                      ? <FileText className="h-4 w-4 text-primary shrink-0" />
+                      : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
+                    <span className="text-xs truncate flex-1">{f.name}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase">{f.mimeType.split("/")[1]}</span>
+                  </button>
+                ))}
+              </div>
             </TabsContent>
           </Tabs>
 
