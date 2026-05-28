@@ -23,3 +23,12 @@ verify_jwt = false
 
 [functions.generate-picsart-doc]
 verify_jwt = false
+
+[functions.advanced-analysis-start]
+verify_jwt = false
+
+[functions.advanced-analysis-orchestrator]
+verify_jwt = false
+
+[functions.advanced-analysis-retry]
+verify_jwt = false

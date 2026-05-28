@@ -13,6 +13,7 @@ import SettingsPage from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import AdvancedEngineeringAnalysis from "./pages/AdvancedEngineeringAnalysis";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ const App = () => (
                         <Route path="/loesung" element={<Loesung />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/dokumentation" element={<Dokumentation />} />
+                        <Route path="/advanced-engineering-analysis" element={<AdvancedEngineeringAnalysis />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </AppLayout>

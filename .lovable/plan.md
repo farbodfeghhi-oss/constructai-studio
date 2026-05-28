@@ -1,109 +1,81 @@
-## Ziel
+# Advanced Engineering Analysis — Multi-Agent AI Modul
 
-Den Bereich „Dokumentation" zu einer schlanken „Wissensbasis" umbauen mit drei Tabs:
-1. **DIN/ISO Normen** – Upload + Suche + Aktivieren/Deaktivieren
-2. **Technische Daten** (vorher „Produkt-Datenbank") – Upload + Suche + Aktivieren/Deaktivieren
-3. **Release-Checkliste** – unverändert
+Komplett isoliertes neues Modul. Keine bestehenden Dateien werden angefasst außer:
+- `src/App.tsx` (nur neue Route hinzufügen)
+- `src/components/AppSidebar.tsx` (nur neuer Nav-Eintrag)
+- `supabase/config.toml` (neue Function registrieren)
 
-Stückliste und Materialien werden komplett entfernt. Alle bisherigen Demo-Daten in DIN/ISO Normen und Produkt-Datenbank werden gelöscht.
+## 1. Neue Route & Navigation
 
-## Umfang
+- Route: `/advanced-engineering-analysis`
+- Sidebar-Eintrag "Advanced Analysis" mit `Sparkles`-Icon
+- Neue Seite: `src/pages/AdvancedEngineeringAnalysis.tsx`
 
-### Navigation & Seite
-- Sidebar-Eintrag „Dokumentation" → **„Wissensbasis"** umbenennen (`src/components/AppSidebar.tsx`).
-- `src/pages/Dokumentation.tsx` neu strukturieren:
-  - Titel „Wissensbasis", neue Kurzbeschreibung.
-  - Tabs „Stückliste" und „Materialien" entfernen (samt Logik, Konstanten, State).
-  - Tabs „DIN/ISO Normen" und „Technische Daten" durch neue Wissens-Komponente ersetzen.
-  - Tab „Release-Checkliste" unverändert lassen.
+## 2. Frontend (Dual-Pane Dashboard)
 
-### Neue Wissens-Komponente (für beide Bereiche wiederverwendet)
-Eine gemeinsame Komponente `KnowledgeLibrary` mit Prop `scope: "norm" | "technical"`:
+Neue Komponenten unter `src/components/advanced/`:
 
-- **Upload-Bereich**: PDF, Bild (PNG/JPG/WEBP), URL, freier Text. Keine Größenbeschränkung im Frontend; auch Server-Limits beachten (siehe technische Details).
-- **Fortschrittsanzeige**: Prozent-Balken für Upload + Extraktion + KI-Analyse (Phasen: Upload 0–40%, Textextraktion 40–80%, KI-Analyse 80–100%).
-- **Automatische Metadaten**: Nach Extraktion ruft eine Edge Function die KI auf und liefert **Quelle-Name** (Titel) und **Quelle-Fachbereich** (Kategorie) plus Keywords und Zusammenfassung.
-- **Suchfeld**: Filtert über Titel, Fachbereich, Keywords, Zusammenfassung und Volltext.
-- **Aktivieren/Deaktivieren-Schalter** pro Eintrag (Switch). Nur aktive Einträge werden bei neuen Projekten/Lösungen berücksichtigt.
-- **Listendarstellung**: Kartenliste mit Titel, Fachbereich-Badge, Quelltyp-Icon, Zusammenfassung, Schalter, Löschen-Button.
+- `AdvancedAnalysisPage.tsx` — Layout-Wrapper, ResizablePanelGroup (links Input, rechts Pipeline + Output)
+- `AnalysisInputPanel.tsx` — Linker Bereich:
+  - Prompt-Textarea (Beschreibung, Erwartungen, Ziele)
+  - Drag-and-Drop-Zone (PDF, Bilder, CAD-Screenshots) inkl. Preview-Liste; HEIC/HEIF blockieren (Memory-Regel)
+  - Reference-Selector: lädt Einträge aus `public.knowledge_items` (bestehende Wissensbasis), Multi-Select mit Toggle-Liste + Suchfeld
+  - "Analyse starten"-Button
+- `PipelineStatusPanel.tsx` — Rechter Bereich oben:
+  - 4 Schritte (Aggregator, Gemini, Perplexity, Monica) als Stepper mit Icons + Spinner + Status (pending/running/done/error)
+  - Live-Updates per Realtime-Subscription auf `analysis_runs`
+  - Fehler-Anzeige pro Knoten + Retry-Button für einzelne Phasen
+- `AnalysisReportView.tsx` — Rechter Bereich unten:
+  - Render des finalen Markdown-Reports (react-markdown + remark-gfm für Tabellen, rehype-highlight für Syntax)
+  - Tabs: "Final Report", "Gemini Blueprint", "Perplexity Validation"
+  - Export-Button → PDF (jsPDF + html2canvas, lokal im Browser)
+- `useAnalysisRun.ts` Hook — startet Run, subscribed Realtime, hält State
 
-### Datenbank
-Bestehende Tabelle `public.knowledge_items` wird erweitert (statt einer neuen Tabelle), da sie bereits Felder für Titel, Beschreibung, Kategorie, Datei-URL, Link, Extracted Text, AI Summary und Keywords besitzt.
+Design: Dark-mode-first, semantische Tokens aus `index.css`, Akzent `--accent` (Orange `#F59E0B`) für CTAs, JetBrains Mono für Technik-Output.
 
-Migration:
-- Spalte `scope text not null default 'technical'` hinzufügen (Werte: `'norm'`, `'technical'`).
-- Spalte `is_active boolean not null default true` hinzufügen.
-- Spalte `source_name text` (= „Quelle-Name", vom KI-Analyse-Schritt).
-- Spalte `domain text` (= „Quelle-Fachbereich").
-- Spalte `updated_at` + Trigger.
-- Bestehende Demo-Daten in `public.components` werden gelöscht. Die Tabelle `components` bleibt erhalten, wird aber von der Wissensbasis nicht mehr verwendet (Komponenten-Suche-Modul nutzt sie weiterhin).
+## 3. Backend — Asynchrone Multi-Agent-Pipeline
 
-### Storage
-- Neuer Bucket `knowledge-files` (privat) für PDFs/Bilder.
-- RLS-Policies: nur eigener User darf in `${user.id}/...` schreiben/lesen.
+### Neue DB-Tabelle `analysis_runs`
 
-### Edge Function
-Neue Edge Function `process-knowledge-source` (bzw. bestehende `process-knowledge` erweitern):
-- Eingaben: `{ scope, contentType: 'pdf'|'image'|'url'|'text', fileUrl?, text?, linkUrl? }`.
-- Schritte: Text extrahieren (PDF via `pdfjs-dist` im Browser vor Upload, Bild via Vision-Modell, URL via Firecrawl-ähnlichem Scrape **oder** direkt KI mit URL, Text 1:1).
-- KI-Aufruf (Lovable AI Gateway, `google/gemini-3-flash-preview`) liefert JSON `{ source_name, domain, summary, keywords[] }`.
-- Liefert Metadaten + Extracted Text an Client zur Speicherung.
+Felder: `id`, `user_id`, `prompt`, `reference_ids[]`, `file_paths[]`, `status` (queued/running/done/error), `current_phase` (aggregator/gemini/perplexity/monica/done), `phase_status` (jsonb: per Phase pending/running/done/error + error message), `gemini_blueprint` (jsonb), `perplexity_validation` (jsonb), `monica_report` (text/markdown), `error`, `created_at`, `updated_at`. RLS: nur Owner. Realtime aktiviert.
 
-### Integration mit „Neue Projekte / Lösungen"
-- In `generate-solutions` und `generate-prompt` Edge Functions die aktiven Wissens-Items (`is_active = true`) des Users laden und als Kontext in den Prompt einfügen (Titel + Zusammenfassung der relevantesten Treffer).
+### Neuer Storage-Bucket `analysis-uploads` (privat)
 
-## Technische Details
+Pfad-Konvention `${user_id}/${run_id}/${filename}` (Memory-Regel).
 
-```text
-Tabs (neu):
-  DIN/ISO Normen   → KnowledgeLibrary scope="norm"
-  Technische Daten → KnowledgeLibrary scope="technical"
-  Release-Checkliste → unverändert
-```
+### Neue Edge Functions (alle isoliert, eigene Ordner)
 
-Upload-Flow (Client):
-```text
-1. User wählt PDF/Bild/URL/Text
-2. Bei Datei: in Browser nach Storage hochladen → fileUrl
-   Fortschritt 0–40% via XHR/upload progress
-3. Bei PDF: pdfjs-dist im Browser extrahiert Volltext (40–70%)
-   Bei Bild: an Edge Function senden für Vision-Analyse
-4. Edge Function `process-knowledge-source` aufrufen (70–95%)
-5. Insert in knowledge_items mit scope, source_name, domain,
-   keywords, ai_summary, extracted_text, is_active=true (95–100%)
-```
+1. **`advanced-analysis-start`** (sync, schnell)
+   - Validiert Input (Zod), legt `analysis_runs`-Zeile an (status=queued), lädt Files in Bucket (oder akzeptiert bereits hochgeladene Pfade), triggert `advanced-analysis-orchestrator` per `fetch` ohne `await` (fire-and-forget) und gibt `run_id` zurück.
 
-Edge Function Body:
-```ts
-{
-  scope: "norm" | "technical",
-  contentType: "pdf" | "image" | "url" | "text",
-  rawText?: string,   // für PDF/Text
-  imageBase64?: string,
-  linkUrl?: string,
-}
-→ { source_name, domain, summary, keywords[] }
-```
+2. **`advanced-analysis-orchestrator`** (async, lang laufend)
+   - Phase 1 Aggregator: lädt Files als Base64/Signed-URLs, holt Referenz-Inhalte aus `knowledge_items`, baut strukturiertes Payload, aktualisiert `phase_status`.
+   - Phase 2 Gemini: ruft Lovable AI Gateway (`google/gemini-2.5-pro`, multimodal mit `image_url`/`file`) mit fest definiertem System-Prompt → strukturierter JSON-Blueprint (Tool-Calling für Struktur). Speichert in `gemini_blueprint`.
+   - Phase 3 Perplexity: ruft `https://api.perplexity.ai/chat/completions` mit `sonar-pro` (vorhandener `PERPLEXITY_API_KEY` Connector). Speichert `perplexity_validation`.
+   - Phase 4 Monica: ruft Monica AI (`MONICA_API_KEY` vorhanden) mit `claude-sonnet-4` für Synthese → finaler Markdown-Report mit Executive Summary, CAD Modification Guide, Optimizations, Implementation Plan. Speichert `monica_report`, setzt `status=done`.
+   - Robuste Fehler: pro Phase try/catch, max. 2 Retries mit Exponential Backoff, bei finalem Fehler `phase_status[phase].error` setzen + `status=error`, Pipeline stoppt aber vorhandene Outputs bleiben sichtbar.
+   - Updates nach jeder Phase → Realtime pusht an Frontend.
 
-Limits:
-- Frontend: keine künstliche Größenprüfung für PDFs.
-- Supabase Storage Standard-Limit (50 MB) wird respektiert; falls größer, Hinweis-Toast.
-- Edge Function `process-knowledge-source` schneidet Volltext auf z.B. ersten 30k Zeichen für KI-Analyse, speichert aber vollen Text in DB.
+3. **`advanced-analysis-retry`** — startet Pipeline ab einer bestimmten Phase neu (für Retry-Button im Frontend).
 
-Betroffene Dateien:
-- `src/pages/Dokumentation.tsx` – komplett neu strukturiert
-- `src/components/KnowledgeLibrary.tsx` – **neu**
-- `src/components/AppSidebar.tsx` – Eintrag umbenennen
-- `supabase/functions/process-knowledge-source/index.ts` – **neu**
-- `supabase/functions/generate-solutions/index.ts` – aktive Wissens-Items als Kontext
-- `supabase/functions/generate-prompt/index.ts` – dito
-- Migration: Spalten `scope`, `is_active`, `source_name`, `domain`, `updated_at` auf `knowledge_items`; Bucket `knowledge-files` + Policies; Löschen der Komponenten-Demo-Daten
+### Live-Updates
 
-## Ergebnis
+Supabase Realtime auf `analysis_runs` (UPDATE-Events, gefiltert nach `id`). Kein WebSocket-Eigenbau nötig — Postgres Changes erfüllen die Anforderung.
 
-- Sidebar zeigt „Wissensbasis"; Seite hat nur noch 3 Tabs.
-- Beide Wissens-Bereiche akzeptieren PDF/Bild/URL/Text mit Fortschrittsanzeige.
-- KI ermittelt automatisch „Quelle-Name" und „Quelle-Fachbereich".
-- Suche durchsucht Titel, Fachbereich, Keywords und Volltext.
-- Aktivieren/Deaktivieren steuert, ob ein Eintrag bei neuen Lösungen herangezogen wird.
-- Release-Checkliste bleibt unverändert.
+## 4. Technik / Sicherheit
+
+- API-Keys (`LOVABLE_API_KEY`, `PERPLEXITY_API_KEY`, `MONICA_API_KEY`) ausschließlich serverseitig via `Deno.env.get`.
+- Zod-Validierung aller Edge-Function-Inputs.
+- CORS-Header (`npm:@supabase/supabase-js@2/cors`) in allen Functions.
+- RLS strikt nach `auth.uid()`.
+- Frontend-State: ein zentraler Hook `useAnalysisRun` + React Query für Listen historischer Runs.
+
+## 5. Was NICHT angefasst wird
+
+- `Dashboard`, `Loesung`, `Dokumentation`, `Settings`, `Auth`, `KnowledgeLibrary`, `RichMediaInput`, bestehende Edge Functions (`generate-solutions`, `process-knowledge`, `gdrive-browse` etc.) und bestehende Tabellen außer **lesendem** Zugriff auf `knowledge_items`.
+
+## Offene Fragen
+
+1. Soll die History aller Analysis-Runs als zusätzliche Liste/Sidebar im neuen Modul sichtbar sein, oder reicht der aktuelle Run pro Session?
+2. PDF-Export: einfache HTML-zu-PDF-Konvertierung im Browser (jsPDF) ok, oder bevorzugst du serverseitige PDF-Erzeugung (höhere Qualität, langsamer)?
+3. Perplexity-Modell: `sonar-pro` (Standard, schnell) oder `sonar-deep-research` (deutlich tieferer Report, mehrere Minuten Laufzeit)?
