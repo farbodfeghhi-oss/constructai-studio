@@ -263,6 +263,7 @@ export function KnowledgeLibrary({ scope, uploadLabel, searchPlaceholder, emptyH
       toast({ title: "Fehler", description: e.message || "Verarbeitung fehlgeschlagen", variant: "destructive" });
     } finally {
       setTimeout(() => { setProcessing(false); setProgress(0); setProgressLabel(""); }, 600);
+    }
   }
 
   async function loadDriveFiles() {
