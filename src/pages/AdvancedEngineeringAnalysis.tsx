@@ -3,6 +3,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { AnalysisInputPanel } from "@/components/advanced/AnalysisInputPanel";
 import { PipelineStatusPanel } from "@/components/advanced/PipelineStatusPanel";
 import { AnalysisReportView } from "@/components/advanced/AnalysisReportView";
+import { AnalysisHistory } from "@/components/advanced/AnalysisHistory";
 import { useAnalysisRun } from "@/hooks/useAnalysisRun";
 import { Sparkles } from "lucide-react";
 
@@ -35,11 +36,15 @@ export default function AdvancedEngineeringAnalysis() {
       </header>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={38} minSize={28}>
+        <ResizablePanel defaultSize={18} minSize={14} maxSize={28}>
+          <AnalysisHistory currentRunId={runId} onSelect={setRunId} />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={34} minSize={24}>
           <AnalysisInputPanel onStart={setRunId} disabled={!!active} />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={62} minSize={40}>
+        <ResizablePanel defaultSize={48} minSize={36}>
           <div className="flex flex-col h-full">
             <PipelineStatusPanel run={run} />
             <AnalysisReportView run={run} />
