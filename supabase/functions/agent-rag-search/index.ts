@@ -31,8 +31,9 @@ Deno.serve(async (req) => {
     }
 
     const emb = await callEmbeddings({ model: QUERY_MODEL, input: query });
-    const vec = emb.data?.[0]?.embedding;
-    if (!vec || vec.length !== 2560) throw new Error(`Unerwartete Vektor-Länge: ${vec?.length}`);
+    const raw = emb.data?.[0]?.embedding;
+    const vec = raw != null ? decodeEmbedding(raw) : null;
+    if (!vec || vec.length !== EXPECTED_DIM) throw new Error(`Unerwartete Vektor-Länge: ${vec?.length}`);
 
     const { data, error } = await admin.rpc("match_knowledge_items", {
       query_embedding: `[${vec.join(",")}]`,
