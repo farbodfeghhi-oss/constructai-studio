@@ -74,6 +74,7 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
           <TabsList>
             <TabsTrigger value="final">Final Report</TabsTrigger>
             <TabsTrigger value="design">Mechanik-Design</TabsTrigger>
+            <TabsTrigger value="verification">Mathematische Verifizierung</TabsTrigger>
             <TabsTrigger value="validation">Normen-Validierung</TabsTrigger>
             <TabsTrigger value="standards">Normen Deep Research</TabsTrigger>
           </TabsList>
