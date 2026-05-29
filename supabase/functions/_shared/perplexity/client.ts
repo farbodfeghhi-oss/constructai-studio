@@ -99,8 +99,10 @@ export async function pollDeepResearch(id: string): Promise<AsyncSubmission & { 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per Perplexity docs (OpenAI-compatible): content parts use `text` and `image_url` types.
 // image_url is an object: { url: "https://..." | "data:image/...;base64,..." }
-export type AgentImageInput = { type: "image_url"; image_url: { url: string } };
-export type AgentTextInput = { type: "text"; text: string };
+// Agent API uses `input_text`/`input_image` part types; sonar/chat uses `text`/`image_url`.
+// Allow both to flow through the same type so callers can pick the correct shape per endpoint.
+export type AgentImageInput = { type: "image_url" | "input_image"; image_url?: { url: string }; url?: string };
+export type AgentTextInput = { type: "text" | "input_text"; text: string };
 export type AgentInputItem = AgentTextInput | AgentImageInput;
 
 export interface AgentOptions {

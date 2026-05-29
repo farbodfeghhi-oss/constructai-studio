@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     }).select().single();
     if (error) throw new Error(error.message);
 
-    return new Response(JSON.stringify({ ok: true, job_id: job.id, request_id: submission.id, status: submission.status }), {
+    return new Response(JSON.stringify({ ok: true, job, request_id: submission.id, upstream_status: submission.status }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

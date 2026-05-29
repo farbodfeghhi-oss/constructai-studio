@@ -1,17 +1,29 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, ShieldCheck, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import type { AnalysisRun } from "@/hooks/useAnalysisRun";
+import { useDeepResearchJob } from "@/hooks/useDeepResearchJob";
+import { toast } from "@/hooks/use-toast";
 
 export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
   const reportRef = useRef<HTMLDivElement>(null);
+  const { job, submit, submitting } = useDeepResearchJob();
+
+  const runDeepStandards = async () => {
+    if (!run?.monica_report) return;
+    const res = await submit(
+      `Prüfe folgenden Engineering-Report tiefgehend gegen aktuelle Normen (DIN, EN, ISO, IEC, ASME). Liefere konkrete Verstöße, Konformitäts-Status und Korrekturmaßnahmen.\n\nREPORT:\n${run.monica_report.slice(0, 8000)}`,
+    );
+    if (res) toast({ title: "Deep Research gestartet", description: "Async Job · Polling alle 5s (TTL 7 Tage)." });
+  };
+
 
   const exportPdf = async () => {
     if (!reportRef.current) return;
@@ -50,17 +62,28 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <Tabs defaultValue="final" className="flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between p-4 pb-2">
+        <div className="flex items-center justify-between p-4 pb-2 gap-2 flex-wrap">
           <TabsList>
             <TabsTrigger value="final">Final Report</TabsTrigger>
             <TabsTrigger value="gemini">Gemini Blueprint</TabsTrigger>
             <TabsTrigger value="perplexity">Validation</TabsTrigger>
+            <TabsTrigger value="standards">Normen Deep Research</TabsTrigger>
           </TabsList>
-          {run.monica_report && (
-            <Button size="sm" variant="outline" onClick={exportPdf}>
-              <Download className="h-3.5 w-3.5 mr-1.5" />PDF
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {run.monica_report && (
+              <Button size="sm" variant="outline" onClick={runDeepStandards} disabled={submitting || (job?.status === "pending" || job?.status === "in_progress")}>
+                {(submitting || job?.status === "pending" || job?.status === "in_progress")
+                  ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  : <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />}
+                Normen Deep Research
+              </Button>
+            )}
+            {run.monica_report && (
+              <Button size="sm" variant="outline" onClick={exportPdf}>
+                <Download className="h-3.5 w-3.5 mr-1.5" />PDF
+              </Button>
+            )}
+          </div>
         </div>
 
         <TabsContent value="final" className="flex-1 overflow-auto px-4 pb-4 mt-0">
@@ -103,6 +126,40 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
             </div>
           ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Validierung…</p>}
         </TabsContent>
+
+        <TabsContent value="standards" className="flex-1 overflow-auto px-4 pb-4 mt-0">
+          {!job ? (
+            <p className="text-sm text-muted-foreground p-4">
+              Klicke „Normen Deep Research", um eine asynchrone Tiefen-Recherche (sonar-deep-research, search_mode=academic, gefiltert auf iso.org/din.de/beuth.de/cen.eu) gegen den finalen Report zu starten.
+            </p>
+          ) : job.status === "completed" && job.result ? (
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{(job.result as any).content ?? ""}</ReactMarkdown>
+              {job.citations?.length > 0 && (
+                <div className="mt-4 not-prose">
+                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Quellen ({job.citations.length})</h4>
+                  <ul className="text-xs space-y-1">
+                    {job.citations.map((c: any, i: number) => (
+                      <li key={i}>
+                        <a href={c.url ?? c} target="_blank" rel="noreferrer" className="text-accent hover:underline break-all">
+                          {c.title ?? c.url ?? String(c)}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : job.status === "failed" ? (
+            <p className="text-sm text-destructive p-4">Deep Research fehlgeschlagen: {job.error}</p>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground p-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Deep Research läuft… (Polling alle 5s · TTL 7 Tage)
+            </div>
+          )}
+        </TabsContent>
+
       </Tabs>
     </div>
   );

@@ -168,15 +168,58 @@ function SolutionActions({ loesung, provider, model, projektName }: { loesung: L
     }
   };
 
+  const DEEP_ANALYSIS_SCHEMA = {
+    type: "json_schema" as const,
+    json_schema: {
+      name: "deep_analysis",
+      schema: {
+        type: "object",
+        properties: {
+          festigkeit: { type: "object", properties: { beschreibung: { type: "string" }, berechnungen: { type: "array", items: { type: "string" } }, sicherheitsfaktor: { type: "string" } } },
+          toleranzen: { type: "array", items: { type: "object", properties: { bauteil: { type: "string" }, toleranz: { type: "string" }, passung: { type: "string" }, norm: { type: "string" } } } },
+          werkstoffkennwerte: { type: "array", items: { type: "object", properties: { material: { type: "string" }, zugfestigkeit: { type: "string" }, streckgrenze: { type: "string" }, haerte: { type: "string" }, dichte: { type: "string" } } } },
+          normenDetails: { type: "array", items: { type: "object", properties: { norm: { type: "string" }, titel: { type: "string" }, relevanz: { type: "string" } } } },
+          fertigungshinweise: { type: "array", items: { type: "string" } },
+          qualitaetspruefung: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+  };
+
+  const PROMPT_SCHEMA = {
+    type: "json_schema" as const,
+    json_schema: {
+      name: "tech_prompts",
+      schema: {
+        type: "object",
+        properties: {
+          zeichnungsPrompt: { type: "string" },
+          stuecklistePrompt: { type: "string" },
+          praesentationPrompt: { type: "string" },
+          montagePrompt: { type: "string" },
+        },
+        required: ["zeichnungsPrompt", "stuecklistePrompt", "praesentationPrompt", "montagePrompt"],
+      },
+    },
+  };
+
   const runDeepAnalysis = async () => {
     setLoadingAction("deep");
     try {
-      const { data, error } = await supabase.functions.invoke("generate-solutions", {
-        body: { provider, model, mode: "deep-analysis", loesung },
+      // v2: agent-docgen (sonar-pro + strict json_schema)
+      const { data, error } = await supabase.functions.invoke("agent-docgen", {
+        body: {
+          plan_key: "tech_docgen_structured",
+          prompt:
+            "Erstelle eine DETAILLIERTE FACHANALYSE (Festigkeit, Toleranzen, Werkstoffkennwerte, Normen, Fertigung, QS) für die angegebene Konstruktionslösung. Antworte ausschließlich gemäß JSON-Schema.",
+          context: JSON.stringify(loesung),
+          override_schema: DEEP_ANALYSIS_SCHEMA,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setDeepAnalysis(data);
+      const parsed = data?.structured ?? null;
+      setDeepAnalysis(parsed ?? { rawResponse: data?.content ?? "" });
       toast({ title: "Analyse fertig", description: "Detaillierte Fachanalyse wurde erstellt." });
     } catch (err: any) {
       toast({ title: "Fehler", description: err.message || "Analyse fehlgeschlagen", variant: "destructive" });
@@ -188,13 +231,21 @@ function SolutionActions({ loesung, provider, model, projektName }: { loesung: L
   const generatePrompts = async () => {
     setLoadingAction("prompt");
     try {
-      const { data, error } = await supabase.functions.invoke("generate-solutions", {
-        body: { provider, model, mode: "technical-prompt", loesung },
+      // v2: agent-docgen (sonar-pro + strict json_schema)
+      const { data, error } = await supabase.functions.invoke("agent-docgen", {
+        body: {
+          plan_key: "tech_docgen_structured",
+          prompt:
+            "Erstelle vier hochwertige KI-Prompts (Technische Zeichnung, Stückliste, Präsentation, Montageanleitung) für die folgende Konstruktionslösung. Jeder Prompt ist eigenständig nutzbar.",
+          context: JSON.stringify(loesung),
+          override_schema: PROMPT_SCHEMA,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setTechPrompts(data);
-      toast({ title: "Prompts erstellt", description: "KI-Prompts für technische Dokumentation wurden generiert." });
+      const parsed = data?.structured ?? null;
+      setTechPrompts(parsed ?? { rawResponse: data?.content ?? "" });
+      toast({ title: "Prompts erstellt", description: "KI-Prompts wurden generiert." });
     } catch (err: any) {
       toast({ title: "Fehler", description: err.message || "Prompt-Generierung fehlgeschlagen", variant: "destructive" });
     } finally {
@@ -528,21 +579,39 @@ export default function Loesung() {
     setSelectedHistory(null);
 
     try {
-      const images = attachments.filter((a) => a.type === "image").map((a) => a.dataUrl);
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase.functions.invoke("generate-solutions", {
-        body: { projektName, anforderungen, provider, model: provider === "monica" ? monicaModel : undefined, images, userId: user?.id },
+      const images = attachments
+        .filter((a) => a.type === "image")
+        .map((a) => ({ url: a.dataUrl }));
+
+      const userPrompt = projektName
+        ? `Projekt: ${projektName}\n\nAnforderungen:\n${anforderungen}`
+        : anforderungen;
+
+      // v2: agent-design (Perplexity Agent API · multimodal · multi-model fallback)
+      const { data, error } = await supabase.functions.invoke("agent-design", {
+        body: { prompt: userPrompt, images, plan_key: "mech_design_agent" },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      if (data?.loesungen) {
-        setLoesungen(data.loesungen);
-        toast({ title: "Lösungen generiert", description: `${data.loesungen.length} Varianten erstellt.` });
-        await saveSolution(data.loesungen, null);
-      } else if (data?.rawResponse) {
-        setRawResponse(data.rawResponse);
-        await saveSolution([], data.rawResponse);
+      const content: string = data?.content ?? "";
+      let parsed: { loesungen?: Loesung[] } | null = null;
+      // Strict JSON first, then fall back to first {...} block from markdown.
+      try { parsed = JSON.parse(content); } catch {
+        const m = content.match(/\{[\s\S]*\}/);
+        if (m) { try { parsed = JSON.parse(m[0]); } catch { parsed = null; } }
+      }
+
+      if (parsed?.loesungen?.length) {
+        setLoesungen(parsed.loesungen);
+        toast({
+          title: "Lösungen generiert",
+          description: `${parsed.loesungen.length} Varianten · ${data?.mode === "sonar-vision" ? "Multimodal (Sonar Vision)" : "Agent API"}`,
+        });
+        await saveSolution(parsed.loesungen, null);
+      } else {
+        setRawResponse(content || "(keine Antwort)");
+        await saveSolution([], content);
       }
     } catch (err: any) {
       toast({ title: "Fehler", description: err.message || "Generierung fehlgeschlagen", variant: "destructive" });
