@@ -95,6 +95,7 @@ export type Database = {
           plan_name: string | null
           prompt: string
           reference_ids: string[]
+          standards_request_id: string | null
           standards_validation: Json | null
           status: string
           updated_at: string
@@ -114,6 +115,7 @@ export type Database = {
           plan_name?: string | null
           prompt: string
           reference_ids?: string[]
+          standards_request_id?: string | null
           standards_validation?: Json | null
           status?: string
           updated_at?: string
@@ -133,6 +135,7 @@ export type Database = {
           plan_name?: string | null
           prompt?: string
           reference_ids?: string[]
+          standards_request_id?: string | null
           standards_validation?: Json | null
           status?: string
           updated_at?: string
