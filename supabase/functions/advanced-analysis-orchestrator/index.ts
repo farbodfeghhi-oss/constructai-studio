@@ -3,7 +3,7 @@
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { submitDeepResearch, pollDeepResearch } from "../_shared/perplexity/client.ts";
+import { submitDeepResearch } from "../_shared/perplexity/client.ts";
 import { extractCitations } from "../_shared/perplexity/citations.ts";
 import { ANTI_HALLUCINATION, loadRolePlan } from "../_shared/perplexity/prompts.ts";
 
