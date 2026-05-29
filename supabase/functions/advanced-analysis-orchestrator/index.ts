@@ -277,8 +277,10 @@ Deno.serve(async (req) => {
           } else if (phase === "standards") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design) throw new Error("Missing design blueprint");
-            standards = await standardsPhase(design, aggregated);
-            await updateRun(run_id, { standards_validation: standards });
+            // Submit Deep Research, then exit. The ticker takes over polling.
+            await standardsSubmit(run_id, design, aggregated);
+            // Leave standards as "running"; ticker advances it and re-invokes orchestrator with start_phase=docgen.
+            return;
           } else if (phase === "docgen") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design || !standards) throw new Error("Missing prior phases");
@@ -286,6 +288,7 @@ Deno.serve(async (req) => {
             await updateRun(run_id, { final_report: report });
           }
           await setPhase(run_id, phase, "done");
+
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.error(`Phase ${phase} failed:`, msg);
