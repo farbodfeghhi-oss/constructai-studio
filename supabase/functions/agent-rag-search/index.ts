@@ -3,13 +3,14 @@
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { callEmbeddings } from "../_shared/perplexity/client.ts";
+import { callEmbeddings, decodeEmbedding } from "../_shared/perplexity/client.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
 const QUERY_MODEL = "pplx-embed-v1-4b";
+const EXPECTED_DIM = 2560;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -30,8 +31,9 @@ Deno.serve(async (req) => {
     }
 
     const emb = await callEmbeddings({ model: QUERY_MODEL, input: query });
-    const vec = emb.data?.[0]?.embedding;
-    if (!vec || vec.length !== 2560) throw new Error(`Unerwartete Vektor-Länge: ${vec?.length}`);
+    const raw = emb.data?.[0]?.embedding;
+    const vec = raw != null ? decodeEmbedding(raw) : null;
+    if (!vec || vec.length !== EXPECTED_DIM) throw new Error(`Unerwartete Vektor-Länge: ${vec?.length}`);
 
     const { data, error } = await admin.rpc("match_knowledge_items", {
       query_embedding: `[${vec.join(",")}]`,

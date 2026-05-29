@@ -15,6 +15,14 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const MAX_BYTES = 50 * 1024 * 1024;
 
+function normalizeImage(img: any): { url: string } {
+  // Accept either { url } or { image_url: { url } } or { image_url: "..." } or raw string.
+  if (typeof img === "string") return { url: img };
+  const url = img?.url ?? img?.image_url?.url ?? img?.image_url;
+  if (typeof url !== "string") throw new Error("Bild ohne gültige URL");
+  return { url };
+}
+
 function validateImage(img: { url: string }): void {
   const m = img.url.match(/^data:([^;]+);base64,(.+)$/);
   if (m) {
@@ -44,7 +52,8 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    for (const img of images) validateImage(img);
+    const normImages = (images as any[]).map(normalizeImage);
+    for (const img of normImages) validateImage(img);
 
     const plan = (await loadRolePlan(admin, plan_key ?? "mech_design_agent")) ?? null;
     const systemPrompt = (plan?.system_prompt ?? "") + "\n\n" + ANTI_HALLUCINATION;
@@ -53,8 +62,9 @@ Deno.serve(async (req) => {
       ? plan.models.array
       : ["anthropic/claude-opus-4-7", "openai/gpt-5.5"];
 
-    const content: AgentInputItem[] = [{ type: "text", text: prompt }];
-    for (const img of images) content.push({ type: "image_url", image_url: { url: img.url } });
+    // Agent API content parts: input_text / input_image (image_url is a string).
+    const content: AgentInputItem[] = [{ type: "input_text", text: prompt }];
+    for (const img of normImages) content.push({ type: "input_image", image_url: img.url });
 
     const resp = await callAgent({
       models: modelsArray.slice(0, 5),
@@ -64,11 +74,18 @@ Deno.serve(async (req) => {
       max_steps: plan?.max_steps ?? 6,
     });
 
-    const text =
-      resp?.output_text ??
-      resp?.choices?.[0]?.message?.content ??
-      resp?.output?.[0]?.content?.[0]?.text ??
-      "";
+    // The assistant message may not be at output[0] when web_search ran first.
+    // Walk all output items and pick the last assistant message's output_text.
+    let text: string = resp?.output_text ?? "";
+    if (!text && Array.isArray(resp?.output)) {
+      for (const item of resp.output) {
+        if (item?.type === "message" || item?.role === "assistant") {
+          const part = item.content?.find?.((c: any) => c.type === "output_text") ?? item.content?.[0];
+          if (part?.text) text = part.text;
+        }
+      }
+    }
+    if (!text) text = resp?.choices?.[0]?.message?.content ?? "";
     const citations = extractCitations(resp);
 
     return new Response(JSON.stringify({

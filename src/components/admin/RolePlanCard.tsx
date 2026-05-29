@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Edit3, Loader2, Save, X, Search, Brain } from "lucide-react";
+import { CheckCircle2, Edit3, Loader2, Save, X, Search, Brain, Image as ImageIcon, Zap, Database, FileJson, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -12,9 +12,17 @@ export interface RolePlan {
   name: string;
   description: string;
   provider_mode: string;
-  models: Record<string, string>;
+  models: Record<string, any>;
   system_prompt: string;
   is_active: boolean;
+  api_mode?: string;
+  endpoint?: string | null;
+  search_domain_filter?: string[];
+  search_mode?: string | null;
+  response_format?: any;
+  tools?: any[];
+  max_steps?: number | null;
+  supports_multimodal?: boolean;
 }
 
 export function RolePlanCard({ plan, password, onChanged }: { plan: RolePlan; password: string; onChanged: () => void }) {
@@ -71,6 +79,70 @@ export function RolePlanCard({ plan, password, onChanged }: { plan: RolePlan; pa
         </div>
       </div>
       <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{plan.description}</p>
+
+      {/* Technical API spec badges (read-only) */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {plan.api_mode && (
+          <Badge variant="outline" className="border-primary/30 text-[10px] gap-1 font-mono">
+            <Zap className="h-2.5 w-2.5" />{plan.api_mode}
+          </Badge>
+        )}
+        {plan.endpoint && (
+          <Badge variant="outline" className="border-muted text-[10px] gap-1 font-mono text-muted-foreground">
+            {plan.endpoint}
+          </Badge>
+        )}
+        {plan.supports_multimodal && (
+          <Badge variant="outline" className="border-purple-400/40 text-purple-300 text-[10px] gap-1">
+            <ImageIcon className="h-2.5 w-2.5" />multimodal
+          </Badge>
+        )}
+        {plan.search_mode && (
+          <Badge variant="outline" className="border-emerald-400/40 text-emerald-300 text-[10px] gap-1">
+            <Globe className="h-2.5 w-2.5" />{plan.search_mode}
+          </Badge>
+        )}
+        {plan.response_format && (
+          <Badge variant="outline" className="border-cyan-400/40 text-cyan-300 text-[10px] gap-1">
+            <FileJson className="h-2.5 w-2.5" />json_schema
+          </Badge>
+        )}
+        {plan.max_steps != null && (
+          <Badge variant="outline" className="text-[10px] font-mono">max_steps: {plan.max_steps}</Badge>
+        )}
+        {(plan.tools?.length ?? 0) > 0 && (
+          <Badge variant="outline" className="text-[10px] gap-1">
+            <Database className="h-2.5 w-2.5" />{plan.tools!.map((t: any) => t.type || t).join(", ")}
+          </Badge>
+        )}
+      </div>
+
+      {/* Models list */}
+      {plan.models && Object.keys(plan.models).length > 0 && (
+        <div className="mb-3 rounded-md bg-muted/20 border border-border/30 p-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 font-mono">Models</div>
+          <div className="space-y-0.5">
+            {Object.entries(plan.models).map(([k, v]) => (
+              <div key={k} className="text-[10px] font-mono flex gap-2">
+                <span className="text-muted-foreground min-w-[70px]">{k}:</span>
+                <span className="text-foreground/90">{Array.isArray(v) ? v.join(" → ") : String(v)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Domain filters */}
+      {(plan.search_domain_filter?.length ?? 0) > 0 && (
+        <div className="mb-3 rounded-md bg-muted/20 border border-border/30 p-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 font-mono">Domain Filter</div>
+          <div className="flex flex-wrap gap-1">
+            {plan.search_domain_filter!.map((d) => (
+              <code key={d} className="text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40 text-foreground/80">{d}</code>
+            ))}
+          </div>
+        </div>
+      )}
 
       {editing ? (
         <div className="space-y-2">

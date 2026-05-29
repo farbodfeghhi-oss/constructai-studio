@@ -14,7 +14,7 @@ function RolesContent() {
     setLoading(true);
     const { data } = await supabase
       .from("ai_role_plans")
-      .select("id, key, name, description, provider_mode, models, system_prompt, is_active")
+      .select("id, key, name, description, provider_mode, models, system_prompt, is_active, api_mode, endpoint, search_domain_filter, search_mode, response_format, tools, max_steps, supports_multimodal")
       .order("is_active", { ascending: false })
       .order("name");
     setPlans((data ?? []) as any);
