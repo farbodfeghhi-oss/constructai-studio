@@ -16,42 +16,66 @@ export type Database = {
     Tables: {
       ai_role_plans: {
         Row: {
+          api_mode: string
           created_at: string
           description: string
+          endpoint: string | null
           id: string
           is_active: boolean
           is_builtin: boolean
           key: string
+          max_steps: number | null
           models: Json
           name: string
           provider_mode: string
+          response_format: Json | null
+          search_domain_filter: string[]
+          search_mode: string | null
+          supports_multimodal: boolean
           system_prompt: string
+          tools: Json
           updated_at: string
         }
         Insert: {
+          api_mode?: string
           created_at?: string
           description: string
+          endpoint?: string | null
           id?: string
           is_active?: boolean
           is_builtin?: boolean
           key: string
+          max_steps?: number | null
           models?: Json
           name: string
           provider_mode: string
+          response_format?: Json | null
+          search_domain_filter?: string[]
+          search_mode?: string | null
+          supports_multimodal?: boolean
           system_prompt: string
+          tools?: Json
           updated_at?: string
         }
         Update: {
+          api_mode?: string
           created_at?: string
           description?: string
+          endpoint?: string | null
           id?: string
           is_active?: boolean
           is_builtin?: boolean
           key?: string
+          max_steps?: number | null
           models?: Json
           name?: string
           provider_mode?: string
+          response_format?: Json | null
+          search_domain_filter?: string[]
+          search_mode?: string | null
+          supports_multimodal?: boolean
           system_prompt?: string
+          tools?: Json
           updated_at?: string
         }
         Relationships: []
@@ -212,6 +236,45 @@ export type Database = {
         }
         Relationships: []
       }
+      deep_research_jobs: {
+        Row: {
+          citations: Json
+          created_at: string
+          error: string | null
+          id: string
+          perplexity_request_id: string
+          prompt: string
+          result: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          citations?: Json
+          created_at?: string
+          error?: string | null
+          id?: string
+          perplexity_request_id: string
+          prompt: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          citations?: Json
+          created_at?: string
+          error?: string | null
+          id?: string
+          perplexity_request_id?: string
+          prompt?: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       knowledge_items: {
         Row: {
           ai_summary: string | null
@@ -220,6 +283,8 @@ export type Database = {
           created_at: string
           description: string | null
           domain: string | null
+          embedding: string | null
+          embedding_model: string | null
           extracted_text: string | null
           file_url: string | null
           id: string
@@ -239,6 +304,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           domain?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
           extracted_text?: string | null
           file_url?: string | null
           id?: string
@@ -258,6 +325,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           domain?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
           extracted_text?: string | null
           file_url?: string | null
           id?: string
@@ -337,6 +406,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      match_knowledge_items: {
+        Args: {
+          match_count?: number
+          p_user_id?: string
+          query_embedding: string
+        }
+        Returns: {
+          ai_summary: string
+          category: string
+          id: string
+          similarity: number
+          title: string
+        }[]
+      }
       verify_admin_password: { Args: { p: string }; Returns: boolean }
     }
     Enums: {
