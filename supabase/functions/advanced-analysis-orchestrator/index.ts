@@ -410,7 +410,7 @@ Deno.serve(async (req) => {
           return;
         }
       }
-      await updateRun(run_id, { status: "done", current_phase: "done" });
+      await updateRun(run_id, { status: "done", current_phase: "done", completed_at: new Date().toISOString() });
     } catch (e) {
       console.error("Orchestrator fatal:", e);
       await updateRun(run_id, { status: "error", error: e instanceof Error ? e.message : String(e) });
