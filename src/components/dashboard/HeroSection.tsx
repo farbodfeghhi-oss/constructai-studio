@@ -1,17 +1,19 @@
-import { Sparkles, Cpu, Activity } from "lucide-react";
+import { Sparkles, Cpu, Activity, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
   heroUrl?: string;
   generating: boolean;
+  isRegenerating?: boolean;
+  onRegenerate?: () => void;
+  onRegenerateAll?: () => void;
 }
 
-export function HeroSection({ heroUrl, generating }: Props) {
+export function HeroSection({ heroUrl, generating, isRegenerating, onRegenerate, onRegenerateAll }: Props) {
   const navigate = useNavigate();
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-[#0a0e27]">
-      {/* Background image */}
+    <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-[#0a0e27] group">
       <div className="absolute inset-0">
         {heroUrl ? (
           <img
@@ -23,7 +25,6 @@ export function HeroSection({ heroUrl, generating }: Props) {
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#0a0e27] via-[#1e3a8a] to-[#0a0e27] animate-pulse" />
         )}
-        {/* Overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0e27] via-[#0a0e27]/70 to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(245,158,11,0.15),transparent_60%)]" />
         <div
@@ -34,6 +35,40 @@ export function HeroSection({ heroUrl, generating }: Props) {
             backgroundSize: "48px 48px",
           }}
         />
+        {isRegenerating && (
+          <div className="absolute inset-0 bg-[#0a0e27]/70 backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/20 border border-accent/40 text-accent text-sm font-mono">
+              <Loader2 className="h-4 w-4 animate-spin" /> Hero wird neu gerendert…
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Regeneration controls */}
+      <div className="absolute top-3 right-3 z-20 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onRegenerate && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onRegenerate}
+            disabled={isRegenerating}
+            className="h-7 px-2 text-[10px] bg-black/40 backdrop-blur border-white/20 text-white hover:bg-black/60"
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${isRegenerating ? "animate-spin" : ""}`} /> Hero neu
+          </Button>
+        )}
+        {onRegenerateAll && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onRegenerateAll}
+            disabled={isRegenerating || generating}
+            className="h-7 px-2 text-[10px] bg-black/40 backdrop-blur border-white/20 text-white hover:bg-black/60"
+            title="Alle Visuals neu generieren"
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${generating ? "animate-spin" : ""}`} /> Alle neu
+          </Button>
+        )}
       </div>
 
       <div className="relative px-8 py-16 md:px-14 md:py-24 max-w-5xl">

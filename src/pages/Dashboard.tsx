@@ -6,14 +6,20 @@ import { AiModelsBar } from "@/components/dashboard/AiModelsBar";
 import { useDashboardAssets } from "@/hooks/useDashboardAssets";
 
 export default function Dashboard() {
-  const { assets, generating } = useDashboardAssets();
+  const { assets, generating, regenerate, regenerateKey, regeneratingKeys } = useDashboardAssets();
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto">
-      <HeroSection heroUrl={assets["hero"]} generating={generating} />
+      <HeroSection
+        heroUrl={assets["hero"]}
+        generating={generating}
+        isRegenerating={regeneratingKeys.has("hero")}
+        onRegenerate={() => regenerateKey("hero")}
+        onRegenerateAll={regenerate}
+      />
       <StatsCounter />
       <AiModelsBar />
-      <CapabilityGrid assets={assets} />
+      <CapabilityGrid assets={assets} regeneratingKeys={regeneratingKeys} onRegenerateKey={regenerateKey} />
       <LiveAnalysisFeed />
       <footer className="pt-8 pb-4 border-t border-border/40 text-center">
         <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">

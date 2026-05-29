@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CheckCircle2, AlertTriangle, Clock, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
-interface Run { id: string; prompt: string; status: string; created_at: string; }
+interface Run { id: string; prompt: string; status: string; created_at: string; plan_name: string | null; }
 
 export function LiveAnalysisFeed() {
   const [runs, setRuns] = useState<Run[]>([]);
@@ -14,7 +14,7 @@ export function LiveAnalysisFeed() {
       if (!u.user) return;
       const { data } = await supabase
         .from("analysis_runs")
-        .select("id, prompt, status, created_at")
+        .select("id, prompt, status, created_at, plan_name")
         .eq("user_id", u.user.id)
         .order("created_at", { ascending: false })
         .limit(5);
@@ -55,7 +55,17 @@ export function LiveAnalysisFeed() {
               {icon(r.status)}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-foreground truncate">{r.prompt}</div>
-                <div className="text-[10px] font-mono text-muted-foreground">{new Date(r.created_at).toLocaleString("de-DE")} · {r.id.slice(0, 8)}</div>
+                <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                  <span>{new Date(r.created_at).toLocaleString("de-DE")}</span>
+                  <span>·</span>
+                  <span>{r.id.slice(0, 8)}</span>
+                  {r.plan_name && (
+                    <>
+                      <span>·</span>
+                      <span className="px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">{r.plan_name}</span>
+                    </>
+                  )}
+                </div>
               </div>
               <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{r.status}</span>
             </li>
