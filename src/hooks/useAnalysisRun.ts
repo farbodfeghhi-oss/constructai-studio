@@ -21,6 +21,10 @@ export interface AnalysisRun {
   plan_id: string | null;
   plan_key: string | null;
   plan_name: string | null;
+  models_used: Record<string, string> | null;
+  generated_images: Array<{ url: string; path?: string; prompt: string; kind: string; label?: string; created_at: string }> | null;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
