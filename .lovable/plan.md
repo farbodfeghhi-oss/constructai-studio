@@ -1,62 +1,124 @@
+
 ## Ziel
-Drei Erweiterungen für MechAI:
-1. Voller Editor für AI-Rollen-Pläne (Name, Beschreibung, System-Prompt, Modelle) unter `/ai-roles`
-2. Aktiver Plan wird pro `analysis_runs`-Datensatz mitgespeichert und sichtbar gemacht
-3. Dashboard erhält "Visuals neu generieren"-Button mit Ladestatus pro Asset
+
+Erweiterung der bestehenden 4-Phasen-Pipeline (`aggregator → design → standards → docgen`) auf **5 Phasen** mit semantischer Vektorsuche in Phase 1 und einer neuen Reasoning-Phase 3 (`sonar-reasoning-pro` mit `<think>`-Parser).
 
 ---
 
-### Phase 1 · Datenbank-Migration
+## Backend
 
-**Neue Spalten in `public.analysis_runs`:**
-- `plan_id UUID NULL` — Referenz auf den verwendeten `ai_role_plans.id`
-- `plan_key TEXT NULL` — Snapshot des Keys (überlebt Plan-Löschung)
-- `plan_name TEXT NULL` — Snapshot des Namens zur Anzeige in der Historie
+### 1. DB-Migration (`analysis_runs`)
+- `ALTER TABLE public.analysis_runs ADD COLUMN verification_blueprint jsonb;`
+- Default für `phase_status` aktualisieren auf:
+  ```json
+  {"aggregator":{"status":"pending"},"design":{"status":"pending"},"verification":{"status":"pending"},"standards":{"status":"pending"},"docgen":{"status":"pending"}}
+  ```
+- Bestehende laufende/queued Runs erhalten den neuen Default per Backfill.
 
-### Phase 2 · Edge Functions
+### 2. Neue Edge Function `agent-verification`
+- Endpoint: `https://api.perplexity.ai/chat/completions`
+- Modell: `sonar-reasoning-pro`
+- Input: `design_blueprint.content` + User-Prompt + RAG-Kontext
+- System-Prompt: Senior-Maschinenbauingenieur — verifiziere Toleranzen, Materialkennwerte, Sicherheitsfaktoren, Lastannahmen, geometrische Plausibilität. Liefere JSON mit `verified_parameters`, `assumptions`, `warnings`, `corrections`.
+- Nach Rückgabe: `parseReasoning()` aus `_shared/perplexity/reasoning.ts` aufrufen.
+- Response shape:
+  ```json
+  { "thinking": "...<think>-Block...", "content": "Antworttext", "json": {...}, "citations": [...] }
+  ```
+- `verify_jwt = false` in `config.toml` ergänzen.
+- Synchroner Call (kein Polling nötig — `sonar-reasoning-pro` antwortet innerhalb von Edge-Function-Limits).
 
-**`update-role-plan` (neu)** — Admin-Endpoint mit Passwortprüfung (analog zu `update-role-prompt`). Akzeptiert `password`, `plan_id`, plus optional: `name` (1–80), `description` (1–500), `system_prompt` (min 10), `models` (JSON-Objekt). Validiert mit Zod und schreibt nur übergebene Felder via Service-Role.
+### 3. Refactor `agent-rag-search` Aufruf in Phase 1
+- `aggregatorPhase` im Orchestrator umbauen:
+  - Statt `knowledge_items.extracted_text.slice(0, 4000)` für jede Referenz:
+  - Pro Referenz (oder global über alle Referenzen) Aufruf von `agent-rag-search` mit `query = run.prompt`, `match_count = 8`, `min_similarity = 0.6`.
+  - Ergebnis: Top-N relevante `knowledge_items` (id, title, ai_summary).
+  - Falls die User-Auswahl `reference_ids` enthält, RAG-Suche auf diese Auswahl beschränken (per Filter in `match_knowledge_items`-RPC oder Nachfilter im Orchestrator).
+  - Bilder: bestehende Signed-URL-Logik (60 Min TTL) unverändert.
+- Edge Case: Wenn `agent-rag-search` `empty: true` zurückliefert, Fallback auf `ai_summary` der explizit gewählten Referenzen (kein hartes Abschneiden mehr).
 
-**`advanced-analysis-start` (Update)** — Liest vor dem Insert den aktuell aktiven Plan (`ai_role_plans.is_active = true`, neuester) und schreibt `plan_id`, `plan_key`, `plan_name` in den neuen Run.
+### 4. Refactor `advanced-analysis-orchestrator/index.ts`
+- `PHASES`-Konstante erweitern: `["aggregator","design","verification","standards","docgen"]`.
+- Neue Funktion `verificationPhase(run, aggregatedContext, designBlueprint)`:
+  - Ruft `agent-verification` auf, schreibt `verification_blueprint = { content, thinking, json, citations }` in DB.
+- `standardsSubmit` (bestehende async Submit-Logik) erhält zusätzlich `verification_blueprint` im Prompt-Body.
+- `docgenPhase` erhält alle drei Blueprints (Design + Verification + Standards) als Input.
+- Phasen-Routing in `start_phase`-Handling und `advanced-analysis-retry` um `verification` ergänzen.
 
-**`dashboard-assets` (Update)** — Akzeptiert neuen Body-Parameter `keys: string[]`, um einzelne Assets gezielt neu zu rendern. `force: true` regeneriert weiterhin alles.
+### 5. `advanced-analysis-retry/index.ts`
+- `verification` als gültigen Retry-Phase-Key zulassen.
 
-### Phase 3 · Frontend — AI-Rollen-Editor
-
-**`RolePlanCard.tsx`** komplett editierbar machen:
-- Inline-Editor (Modus „Bearbeiten") mit Feldern: Name, Beschreibung (Textarea), System-Prompt (Textarea), Modelle (JSON-Editor mit Validierung + Hilfe-Tooltip mit Schema-Beispiel)
-- Speichern ruft neue `update-role-plan` Function
-- Bestehender „Prompt bearbeiten"-Modus wird durch „Plan bearbeiten" ersetzt (umfassender)
-- Read-only Spec-Badges (api_mode, endpoint, tools, etc.) bleiben unverändert sichtbar
-
-### Phase 4 · Frontend — Plan-Anzeige in Analysis Runs
-
-**`LiveAnalysisFeed.tsx`** und **`AnalysisHistory.tsx`**: Pro Run-Zeile ein kleines Plan-Badge (`plan_name`) neben Status anzeigen.
-
-**`useAnalysisRun.ts`** Typ: `plan_id`, `plan_key`, `plan_name` ergänzen.
-
-**`AnalysisReportView.tsx`**: Header zeigt verwendeten Plan ("Ausgeführt mit Rolle: …").
-
-### Phase 5 · Frontend — Dashboard Asset-Regeneration
-
-**`useDashboardAssets.ts`** erweitern um:
-- `regenerateKey(key: string)`-Methode für Einzel-Regeneration
-- State `regeneratingKeys: Set<string>` zur Anzeige pro Asset
-
-**`HeroSection.tsx`** & **`CapabilityGrid.tsx`**:
-- Hover-Overlay-Button „Neu generieren" auf Hero und jeder Capability-Kachel
-- Lade-Spinner-Overlay während ein einzelnes Asset regeneriert wird
-- Hero zusätzlich: globaler „Alle Visuals neu generieren"-Button (versteckt hinter kleinem Refresh-Icon oben rechts)
+### 6. `supabase/config.toml`
+- `[functions.agent-verification]` mit `verify_jwt = false` ergänzen.
 
 ---
 
-### Technische Details
-- `models`-JSON-Editor: einfaches `Textarea` mit `JSON.parse`-Validierung beim Speichern (Toast bei Fehler) — kein zusätzlicher Library-Bedarf
-- Plan-Snapshot in Runs läuft unabhängig vom aktuellen Status der Pläne — gelöschte oder umbenannte Pläne brechen die Historie nicht
-- Asset-Regeneration nutzt bestehenden Picsart-Flow; Polling läuft serverseitig, Client zeigt nur Spinner bis Response
-- Alle Edge-Function-Updates behalten `verify_jwt = false`-Default (Admin-Passwort schützt Mutations)
+## Frontend
 
-### Out of Scope
-- Erstellen komplett neuer Pläne (nur Editieren bestehender)
-- Versionierung der Plan-Änderungen
-- Bulk-Aktionen über mehrere Pläne
+### 7. `src/hooks/useAnalysisRun.ts`
+- `PhaseKey` erweitern: `"aggregator" | "design" | "verification" | "standards" | "docgen"`.
+- `AnalysisRun`-Interface um `verification_blueprint: any` ergänzen.
+
+### 8. `src/components/advanced/PipelineStatusPanel.tsx`
+- `PHASES`-Array auf 5 Einträge erweitern, neuer Schritt 3:
+  ```
+  { key: "verification", label: "Perplexity · Logical Verification",
+    sub: "sonar-reasoning-pro · <think>-CoT · Toleranzen & Physik",
+    icon: Calculator }
+  ```
+
+### 9. `src/components/advanced/AnalysisReportView.tsx`
+- Neuer Tab `"verification"` mit Label „Mathematische Verifizierung".
+- Anzeige:
+  - **Reasoning (`<think>`)** in einem ausklappbaren `<details>`-Block, Monospace.
+  - **Verifizierte Parameter** als Markdown aus `verification_blueprint.content`.
+  - **Strukturiertes JSON** (`verified_parameters`, `warnings`, `corrections`) als Tabelle, falls `verification_blueprint.json` vorhanden.
+  - Zitate wie bei Design/Standards.
+
+### 10. `src/pages/AdvancedEngineeringAnalysis.tsx`
+- Header-Untertitel anpassen: „100% Perplexity Pipeline · RAG → Design → Verification → Standards → Docgen".
+
+---
+
+## Technische Details
+
+### Datenfluss
+
+```text
+User-Prompt + reference_ids + file_paths
+         │
+         ▼
+[1] aggregator     → agent-rag-search (pplx-embed-v1-4b, cosine, top-N)
+         │           + Signed URLs (60 min) für Bilder
+         ▼
+[2] design         → agent-design (Claude Opus 4.7 / Sonar Vision)
+         │           ⇒ design_blueprint
+         ▼
+[3] verification   → agent-verification (sonar-reasoning-pro + parseReasoning)
+         │           ⇒ verification_blueprint { thinking, content, json }
+         ▼
+[4] standards      → agent-standards (sonar-deep-research, async)
+         │           + standards-tick Poller
+         │           ⇒ standards_validation
+         ▼
+[5] docgen         → agent-docgen (sonar-pro json_schema)
+                     ⇒ final_report
+```
+
+### Reasoning-Parser-Integration
+- `_shared/perplexity/reasoning.ts` existiert bereits und liefert `{ thinking, answer, json }`.
+- In `agent-verification` direkt auf `choices[0].message.content` anwenden, dann strukturiert speichern.
+
+### RAG-Filter auf `reference_ids`
+- Aktuell unterstützt `match_knowledge_items(query_embedding, match_count, p_user_id)` nur User-Scope.
+- Plan: Im Orchestrator nach RPC-Call nachfiltern (`matches.filter(m => reference_ids.includes(m.id))`), falls `reference_ids.length > 0`. Optional spätere RPC-Erweiterung — nicht in dieser Iteration.
+
+### Abwärtskompatibilität
+- Alte Runs ohne `verification_blueprint` zeigen im Tab den Hinweis „Phase in dieser älteren Pipeline-Version nicht ausgeführt".
+
+---
+
+## Out of Scope
+- Keine Änderungen an `agent-design`, `agent-standards`, `agent-standards-poll`, `agent-docgen`, `agent-rag-embed`.
+- Kein Reasoning-Modell-Wechsel.
+- Keine UI-Redesigns außer dem neuen Tab und dem 5. Pipeline-Step.
