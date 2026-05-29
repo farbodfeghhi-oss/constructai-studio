@@ -71,7 +71,8 @@ export interface SonarOptions {
 }
 
 export async function callSonar(opts: SonarOptions): Promise<any> {
-  return withRetry(() => postJson(`${V1}/chat/completions`, opts));
+  // Sync chat completions endpoint is at BASE (NOT /v1/).
+  return withRetry(() => postJson(`${BASE}/chat/completions`, opts));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
