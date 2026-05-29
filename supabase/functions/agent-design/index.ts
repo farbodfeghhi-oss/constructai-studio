@@ -74,13 +74,18 @@ Deno.serve(async (req) => {
       max_steps: plan?.max_steps ?? 6,
     });
 
-    // Output: response.output[0].content[0].text (type: "output_text")
-    const text =
-      resp?.output_text ??
-      resp?.output?.[0]?.content?.find?.((c: any) => c.type === "output_text")?.text ??
-      resp?.output?.[0]?.content?.[0]?.text ??
-      resp?.choices?.[0]?.message?.content ??
-      "";
+    // The assistant message may not be at output[0] when web_search ran first.
+    // Walk all output items and pick the last assistant message's output_text.
+    let text: string = resp?.output_text ?? "";
+    if (!text && Array.isArray(resp?.output)) {
+      for (const item of resp.output) {
+        if (item?.type === "message" || item?.role === "assistant") {
+          const part = item.content?.find?.((c: any) => c.type === "output_text") ?? item.content?.[0];
+          if (part?.text) text = part.text;
+        }
+      }
+    }
+    if (!text) text = resp?.choices?.[0]?.message?.content ?? "";
     const citations = extractCitations(resp);
 
     return new Response(JSON.stringify({
