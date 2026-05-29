@@ -62,17 +62,28 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <Tabs defaultValue="final" className="flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between p-4 pb-2">
+        <div className="flex items-center justify-between p-4 pb-2 gap-2 flex-wrap">
           <TabsList>
             <TabsTrigger value="final">Final Report</TabsTrigger>
             <TabsTrigger value="gemini">Gemini Blueprint</TabsTrigger>
             <TabsTrigger value="perplexity">Validation</TabsTrigger>
+            <TabsTrigger value="standards">Normen Deep Research</TabsTrigger>
           </TabsList>
-          {run.monica_report && (
-            <Button size="sm" variant="outline" onClick={exportPdf}>
-              <Download className="h-3.5 w-3.5 mr-1.5" />PDF
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {run.monica_report && (
+              <Button size="sm" variant="outline" onClick={runDeepStandards} disabled={submitting || (job?.status === "pending" || job?.status === "in_progress")}>
+                {(submitting || job?.status === "pending" || job?.status === "in_progress")
+                  ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  : <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />}
+                Normen Deep Research
+              </Button>
+            )}
+            {run.monica_report && (
+              <Button size="sm" variant="outline" onClick={exportPdf}>
+                <Download className="h-3.5 w-3.5 mr-1.5" />PDF
+              </Button>
+            )}
+          </div>
         </div>
 
         <TabsContent value="final" className="flex-1 overflow-auto px-4 pb-4 mt-0">
