@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       embedded: items.length - failed.length,
       failed,
       model: DOC_MODEL,
-      dim: 2560,
+      dim: EXPECTED_DIM,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
