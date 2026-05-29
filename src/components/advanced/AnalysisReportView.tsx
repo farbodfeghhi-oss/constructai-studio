@@ -61,6 +61,14 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
+      {run.plan_name && (
+        <div className="px-4 pt-3 pb-1">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded bg-accent/10 text-accent border border-accent/30">
+            Ausgeführt mit Rolle: <strong className="font-semibold">{run.plan_name}</strong>
+            {run.plan_key && <code className="opacity-60">· {run.plan_key}</code>}
+          </span>
+        </div>
+      )}
       <Tabs defaultValue="final" className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between p-4 pb-2 gap-2 flex-wrap">
           <TabsList>
