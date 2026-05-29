@@ -21,7 +21,7 @@ export default function AdvancedEngineeringAnalysis() {
           </div>
           <div>
             <h1 className="text-base font-bold tracking-tight">Advanced Engineering Analysis</h1>
-            <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Multi-Agent Pipeline · Gemini → Perplexity → Monica</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-widest">100% Perplexity Pipeline · Design → Standards → Docgen</p>
           </div>
         </div>
         {run && (
