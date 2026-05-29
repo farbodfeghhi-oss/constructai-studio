@@ -62,30 +62,28 @@ Deno.serve(async (req) => {
       ? plan.models.array
       : ["anthropic/claude-opus-4-7", "openai/gpt-5.5"];
 
-    // OpenAI-compatible content parts: text + image_url (image_url as object with .url)
-    const content: AgentInputItem[] = [{ type: "text", text: prompt }];
-    for (const img of normImages) content.push({ type: "image_url", image_url: { url: img.url } });
-
     let resp: any;
     let modeUsed: "agent" | "sonar-vision";
 
     if (normImages.length > 0) {
-      // Multimodal path → sonar-pro on /chat/completions (Agent API rejects image parts).
+      // Multimodal path → sonar-pro on /chat/completions (OpenAI-compatible: text + image_url).
       modeUsed = "sonar-vision";
+      const sonarContent: any[] = [{ type: "text", text: prompt }];
+      for (const img of normImages) sonarContent.push({ type: "image_url", image_url: { url: img.url } });
       resp = await callSonar({
         model: "sonar-pro",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: content as any },
+          { role: "user", content: sonarContent },
         ],
       });
     } else {
-      // Text-only path → Agent API with multi-model fallback + web_search.
+      // Text-only path → Agent API with multi-model fallback + web_search (uses input_text parts).
       modeUsed = "agent";
       resp = await callAgent({
         models: modelsArray.slice(0, 5),
         instructions: systemPrompt,
-        input: [{ role: "user", content }],
+        input: [{ role: "user", content: [{ type: "input_text", text: prompt }] as AgentInputItem[] }],
         tools: (plan?.tools ?? [{ type: "web_search" }]) as Array<{ type: string }>,
         max_steps: plan?.max_steps ?? 6,
       });
