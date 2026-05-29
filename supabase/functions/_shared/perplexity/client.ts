@@ -97,14 +97,14 @@ export async function pollDeepResearch(id: string): Promise<AsyncSubmission & { 
 // AGENT API — POST /v1/agent
 // Multi-model fallback (max 5), multimodal (image_url with PNG/JPEG/WEBP/GIF, ≤50MB).
 // ─────────────────────────────────────────────────────────────────────────────
-export type AgentImageInput = { type: "image_url"; image_url: { url: string } };
-export type AgentTextInput = { type: "text"; text: string };
+export type AgentImageInput = { type: "input_image"; image_url: string };
+export type AgentTextInput = { type: "input_text"; text: string };
 export type AgentInputItem = AgentTextInput | AgentImageInput;
 
 export interface AgentOptions {
   models: string[]; // 1..5 model IDs (primary first, fallbacks after)
   instructions?: string; // system prompt (re-read every loop)
-  input: Array<{ role: "user" | "assistant" | "system"; content: AgentInputItem[] }>;
+  input: Array<{ role: "user" | "assistant" | "system"; content: AgentInputItem[] }> | string;
   tools?: Array<{ type: string } | Record<string, unknown>>;
   max_steps?: number;
   response_format?: unknown;
@@ -119,20 +119,34 @@ export async function callAgent(opts: AgentOptions): Promise<any> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EMBEDDINGS — POST /v1/embeddings
-// pplx-embed-context-v1-4b (documents) | pplx-embed-v1-4b (queries) — 2560 dim, unnormalized → cosine
-// No instruction prefixes needed (mean-pooling).
+// Available models: pplx-embed-v1-0.6b, pplx-embed-v1-4b  (2560 dim for 4b)
+// Response embedding is base64-encoded int8 by default → decode to Float32-compatible array.
+// Embeddings unnormalised → use cosine similarity in pgvector.
 // ─────────────────────────────────────────────────────────────────────────────
 export interface EmbeddingOptions {
-  model: "pplx-embed-context-v1-4b" | "pplx-embed-v1-4b" | string;
+  model: "pplx-embed-v1-4b" | "pplx-embed-v1-0.6b" | string;
   input: string | string[];
 }
 
 export interface EmbeddingResponse {
-  data: Array<{ embedding: number[]; index: number }>;
+  data: Array<{ embedding: string | number[]; index: number }>;
   model: string;
   usage?: { prompt_tokens: number; total_tokens: number };
 }
 
 export async function callEmbeddings(opts: EmbeddingOptions): Promise<EmbeddingResponse> {
   return withRetry(() => postJson<EmbeddingResponse>(`${V1}/embeddings`, opts));
+}
+
+/** Decode base64-int8 embedding from Perplexity into a number[] (length = dim). */
+export function decodeEmbedding(emb: string | number[]): number[] {
+  if (Array.isArray(emb)) return emb;
+  // atob → int8 array → number[]
+  const binary = atob(emb);
+  const out = new Array<number>(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    const b = binary.charCodeAt(i);
+    out[i] = b > 127 ? b - 256 : b; // signed int8
+  }
+  return out;
 }
