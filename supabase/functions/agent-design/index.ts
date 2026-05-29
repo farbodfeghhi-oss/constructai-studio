@@ -15,6 +15,14 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const MAX_BYTES = 50 * 1024 * 1024;
 
+function normalizeImage(img: any): { url: string } {
+  // Accept either { url } or { image_url: { url } } or { image_url: "..." } or raw string.
+  if (typeof img === "string") return { url: img };
+  const url = img?.url ?? img?.image_url?.url ?? img?.image_url;
+  if (typeof url !== "string") throw new Error("Bild ohne gültige URL");
+  return { url };
+}
+
 function validateImage(img: { url: string }): void {
   const m = img.url.match(/^data:([^;]+);base64,(.+)$/);
   if (m) {
