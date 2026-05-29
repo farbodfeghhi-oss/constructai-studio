@@ -84,18 +84,18 @@ export type Database = {
         Row: {
           created_at: string
           current_phase: string
+          design_blueprint: Json | null
           error: string | null
           file_paths: string[]
-          gemini_blueprint: Json | null
+          final_report: string | null
           id: string
-          monica_report: string | null
-          perplexity_validation: Json | null
           phase_status: Json
           plan_id: string | null
           plan_key: string | null
           plan_name: string | null
           prompt: string
           reference_ids: string[]
+          standards_validation: Json | null
           status: string
           updated_at: string
           user_id: string
@@ -103,18 +103,18 @@ export type Database = {
         Insert: {
           created_at?: string
           current_phase?: string
+          design_blueprint?: Json | null
           error?: string | null
           file_paths?: string[]
-          gemini_blueprint?: Json | null
+          final_report?: string | null
           id?: string
-          monica_report?: string | null
-          perplexity_validation?: Json | null
           phase_status?: Json
           plan_id?: string | null
           plan_key?: string | null
           plan_name?: string | null
           prompt: string
           reference_ids?: string[]
+          standards_validation?: Json | null
           status?: string
           updated_at?: string
           user_id: string
@@ -122,18 +122,18 @@ export type Database = {
         Update: {
           created_at?: string
           current_phase?: string
+          design_blueprint?: Json | null
           error?: string | null
           file_paths?: string[]
-          gemini_blueprint?: Json | null
+          final_report?: string | null
           id?: string
-          monica_report?: string | null
-          perplexity_validation?: Json | null
           phase_status?: Json
           plan_id?: string | null
           plan_key?: string | null
           plan_name?: string | null
           prompt?: string
           reference_ids?: string[]
+          standards_validation?: Json | null
           status?: string
           updated_at?: string
           user_id?: string
