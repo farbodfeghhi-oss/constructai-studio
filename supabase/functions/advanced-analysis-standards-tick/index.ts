@@ -22,6 +22,7 @@ async function setPhaseError(runId: string, error: string) {
   ps.standards = { status: "error", error };
   await admin.from("analysis_runs").update({
     phase_status: ps, status: "error", error, current_phase: "standards",
+    completed_at: new Date().toISOString(),
   }).eq("id", runId);
 }
 
