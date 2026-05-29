@@ -1,124 +1,81 @@
-
 ## Ziel
+Nach Abschluss eines Analyse-Runs öffnet sich automatisch ein großes Ergebnis-Fenster (Modal/Dialog), das den finalen Engineering-Report **plus** eine Meta-Sidebar zeigt und folgende Aktionen anbietet:
 
-Erweiterung der bestehenden 4-Phasen-Pipeline (`aggregator → design → standards → docgen`) auf **5 Phasen** mit semantischer Vektorsuche in Phase 1 und einer neuen Reasoning-Phase 3 (`sonar-reasoning-pro` mit `<think>`-Parser).
+1. **Run-Metadaten** (AI-Rolle, Haupt-Prompt, Rechenzeit, Quellen, hochgeladene Dateien, verwendete Modelle pro Phase)
+2. **Picsart-Bildgenerierung** auf Basis des Ergebnisses (Technische Zeichnungen / Doku-Bilder)
+3. **Export** als **PDF**, **Word (.docx)** und **HTML**
 
----
-
-## Backend
+## Backend-Änderungen
 
 ### 1. DB-Migration (`analysis_runs`)
-- `ALTER TABLE public.analysis_runs ADD COLUMN verification_blueprint jsonb;`
-- Default für `phase_status` aktualisieren auf:
-  ```json
-  {"aggregator":{"status":"pending"},"design":{"status":"pending"},"verification":{"status":"pending"},"standards":{"status":"pending"},"docgen":{"status":"pending"}}
-  ```
-- Bestehende laufende/queued Runs erhalten den neuen Default per Backfill.
+Neue Spalten:
+- `started_at timestamptz` (gesetzt beim Übergang `queued → running`)
+- `completed_at timestamptz` (gesetzt beim Übergang auf `done`/`error`)
+- `models_used jsonb` (z.B. `{"design":"claude-opus-4.7", "verification":"sonar-reasoning-pro", ...}`)
+- `generated_images jsonb` (Array `{url, prompt, kind, created_at}`)
 
-### 2. Neue Edge Function `agent-verification`
-- Endpoint: `https://api.perplexity.ai/chat/completions`
-- Modell: `sonar-reasoning-pro`
-- Input: `design_blueprint.content` + User-Prompt + RAG-Kontext
-- System-Prompt: Senior-Maschinenbauingenieur — verifiziere Toleranzen, Materialkennwerte, Sicherheitsfaktoren, Lastannahmen, geometrische Plausibilität. Liefere JSON mit `verified_parameters`, `assumptions`, `warnings`, `corrections`.
-- Nach Rückgabe: `parseReasoning()` aus `_shared/perplexity/reasoning.ts` aufrufen.
-- Response shape:
-  ```json
-  { "thinking": "...<think>-Block...", "content": "Antworttext", "json": {...}, "citations": [...] }
-  ```
-- `verify_jwt = false` in `config.toml` ergänzen.
-- Synchroner Call (kein Polling nötig — `sonar-reasoning-pro` antwortet innerhalb von Edge-Function-Limits).
+Backfill für laufende Runs nicht nötig.
 
-### 3. Refactor `agent-rag-search` Aufruf in Phase 1
-- `aggregatorPhase` im Orchestrator umbauen:
-  - Statt `knowledge_items.extracted_text.slice(0, 4000)` für jede Referenz:
-  - Pro Referenz (oder global über alle Referenzen) Aufruf von `agent-rag-search` mit `query = run.prompt`, `match_count = 8`, `min_similarity = 0.6`.
-  - Ergebnis: Top-N relevante `knowledge_items` (id, title, ai_summary).
-  - Falls die User-Auswahl `reference_ids` enthält, RAG-Suche auf diese Auswahl beschränken (per Filter in `match_knowledge_items`-RPC oder Nachfilter im Orchestrator).
-  - Bilder: bestehende Signed-URL-Logik (60 Min TTL) unverändert.
-- Edge Case: Wenn `agent-rag-search` `empty: true` zurückliefert, Fallback auf `ai_summary` der explizit gewählten Referenzen (kein hartes Abschneiden mehr).
+### 2. Orchestrator (`advanced-analysis-orchestrator`)
+- Setzt `started_at` beim ersten Phase-Wechsel und `completed_at` am Ende.
+- Schreibt nach jeder Phase `models_used.<phase> = <model_name>` (aus jeweiliger Agent-Response).
 
-### 4. Refactor `advanced-analysis-orchestrator/index.ts`
-- `PHASES`-Konstante erweitern: `["aggregator","design","verification","standards","docgen"]`.
-- Neue Funktion `verificationPhase(run, aggregatedContext, designBlueprint)`:
-  - Ruft `agent-verification` auf, schreibt `verification_blueprint = { content, thinking, json, citations }` in DB.
-- `standardsSubmit` (bestehende async Submit-Logik) erhält zusätzlich `verification_blueprint` im Prompt-Body.
-- `docgenPhase` erhält alle drei Blueprints (Design + Verification + Standards) als Input.
-- Phasen-Routing in `start_phase`-Handling und `advanced-analysis-retry` um `verification` ergänzen.
+### 3. Neue Edge Function `generate-analysis-image`
+- Input: `run_id`, `kind` ("technical_drawing" | "documentation"), `prompt_override?`
+- Liest `analysis_runs.final_report` + `design_blueprint`.
+- Baut Picsart-Prompt (technische Zeichnung, isometrisch, Bemaßung etc.).
+- Ruft Picsart API (`PICSART_API_KEY` ist bereits vorhanden, siehe `generate-picsart-doc`) → lädt Bild in Storage-Bucket `analysis-uploads/${user_id}/generated/`.
+- Hängt Eintrag an `analysis_runs.generated_images`.
 
-### 5. `advanced-analysis-retry/index.ts`
-- `verification` als gültigen Retry-Phase-Key zulassen.
+### 4. Neue Edge Function `export-analysis-report`
+- Input: `run_id`, `format` ("pdf" | "docx" | "html")
+- HTML: server-rendertes Markdown → HTML mit eingebettetem CSS, inkl. Meta-Tabelle und Bilder.
+- PDF: HTML → PDF via Deno-kompatible Lib (`https://esm.sh/html-pdf-node` Fallback: PDFKit). Bevorzugt: einfache HTML-zu-PDF Route mit `pdf-lib` + minimaler Renderer; alternativ Browser-print im Frontend (siehe Fallback unten).
+- DOCX: `docx`-NPM Lib via esm.sh → Buffer.
+- Antwort: Base64-Blob oder Signed-URL (Upload nach `analysis-uploads/${user_id}/exports/`).
 
-### 6. `supabase/config.toml`
-- `[functions.agent-verification]` mit `verify_jwt = false` ergänzen.
+**Fallback (falls Deno-PDF schwierig):** Export rein clientseitig in den ersten Wurf:
+- HTML: Blob aus Markdown→HTML
+- PDF: `window.print()` über dedizierte Print-View
+- DOCX: `docx` NPM-Paket clientseitig
 
----
+Für saubere Architektur und Konsistenz wähle ich die **Edge-Function-Variante** (`export-analysis-report`).
 
-## Frontend
+## Frontend-Änderungen
 
-### 7. `src/hooks/useAnalysisRun.ts`
-- `PhaseKey` erweitern: `"aggregator" | "design" | "verification" | "standards" | "docgen"`.
-- `AnalysisRun`-Interface um `verification_blueprint: any` ergänzen.
+### 1. Neue Komponente `AnalysisResultDialog.tsx`
+- Vollbild-Dialog (`Dialog` aus shadcn, `max-w-[1400px]`).
+- Öffnet sich automatisch, wenn `run.status === "done"` (gesteuert über lokalen State + Effekt in `AdvancedEngineeringAnalysis.tsx`, mit "X" zum Schließen).
+- Layout: links Report (Markdown-Rendering), rechts Sidebar mit:
+  - **Run-Info**: Plan-Name, Plan-Key (AI-Rolle), Erstellt am, Dauer (`completed_at - started_at`)
+  - **Haupt-Prompt** (collapsible)
+  - **Modelle pro Phase** (aus `models_used`)
+  - **Quellen**: Citations aus Design / Verification / Standards / Docgen
+  - **Hochgeladene Dateien**: aus `file_paths` (Filename + Signed-URL via Edge oder direct)
+  - **RAG-Treffer**: Top-Knowledge-Items (aus `design_blueprint.rag_matches` falls vorhanden — sonst nur Anzahl Referenzen)
+- Aktionen-Toolbar oben rechts:
+  - Buttons: **Export PDF**, **Export Word**, **Export HTML** → ruft `export-analysis-report` und triggert Download.
+  - Button: **Bilder mit Picsart erzeugen** → öffnet Sub-Dialog mit Prompt-Vorschlag (technische Zeichnung / Doku-Bild), ruft `generate-analysis-image`, zeigt Galerie der generierten Bilder unten im Report.
 
-### 8. `src/components/advanced/PipelineStatusPanel.tsx`
-- `PHASES`-Array auf 5 Einträge erweitern, neuer Schritt 3:
-  ```
-  { key: "verification", label: "Perplexity · Logical Verification",
-    sub: "sonar-reasoning-pro · <think>-CoT · Toleranzen & Physik",
-    icon: Calculator }
-  ```
+### 2. `AnalysisReportView.tsx`
+- Bleibt für die Inline-Vorschau im Hauptpanel.
+- Neuer Button "Vollbild-Ansicht" → öffnet `AnalysisResultDialog`.
 
-### 9. `src/components/advanced/AnalysisReportView.tsx`
-- Neuer Tab `"verification"` mit Label „Mathematische Verifizierung".
-- Anzeige:
-  - **Reasoning (`<think>`)** in einem ausklappbaren `<details>`-Block, Monospace.
-  - **Verifizierte Parameter** als Markdown aus `verification_blueprint.content`.
-  - **Strukturiertes JSON** (`verified_parameters`, `warnings`, `corrections`) als Tabelle, falls `verification_blueprint.json` vorhanden.
-  - Zitate wie bei Design/Standards.
+### 3. `useAnalysisRun.ts`
+- Felder ergänzen: `started_at`, `completed_at`, `models_used`, `generated_images`.
 
-### 10. `src/pages/AdvancedEngineeringAnalysis.tsx`
-- Header-Untertitel anpassen: „100% Perplexity Pipeline · RAG → Design → Verification → Standards → Docgen".
-
----
-
-## Technische Details
-
-### Datenfluss
-
-```text
-User-Prompt + reference_ids + file_paths
-         │
-         ▼
-[1] aggregator     → agent-rag-search (pplx-embed-v1-4b, cosine, top-N)
-         │           + Signed URLs (60 min) für Bilder
-         ▼
-[2] design         → agent-design (Claude Opus 4.7 / Sonar Vision)
-         │           ⇒ design_blueprint
-         ▼
-[3] verification   → agent-verification (sonar-reasoning-pro + parseReasoning)
-         │           ⇒ verification_blueprint { thinking, content, json }
-         ▼
-[4] standards      → agent-standards (sonar-deep-research, async)
-         │           + standards-tick Poller
-         │           ⇒ standards_validation
-         ▼
-[5] docgen         → agent-docgen (sonar-pro json_schema)
-                     ⇒ final_report
-```
-
-### Reasoning-Parser-Integration
-- `_shared/perplexity/reasoning.ts` existiert bereits und liefert `{ thinking, answer, json }`.
-- In `agent-verification` direkt auf `choices[0].message.content` anwenden, dann strukturiert speichern.
-
-### RAG-Filter auf `reference_ids`
-- Aktuell unterstützt `match_knowledge_items(query_embedding, match_count, p_user_id)` nur User-Scope.
-- Plan: Im Orchestrator nach RPC-Call nachfiltern (`matches.filter(m => reference_ids.includes(m.id))`), falls `reference_ids.length > 0`. Optional spätere RPC-Erweiterung — nicht in dieser Iteration.
-
-### Abwärtskompatibilität
-- Alte Runs ohne `verification_blueprint` zeigen im Tab den Hinweis „Phase in dieser älteren Pipeline-Version nicht ausgeführt".
-
----
+### 4. `AdvancedEngineeringAnalysis.tsx`
+- Auto-Open-Effekt: wenn Run von `running` → `done` wechselt und Dialog noch nie für diesen Run geöffnet war.
 
 ## Out of Scope
-- Keine Änderungen an `agent-design`, `agent-standards`, `agent-standards-poll`, `agent-docgen`, `agent-rag-embed`.
-- Kein Reasoning-Modell-Wechsel.
-- Keine UI-Redesigns außer dem neuen Tab und dem 5. Pipeline-Step.
+- Keine Änderungen an Pipeline-Logik (aggregator/design/verification/standards/docgen).
+- Keine Mehrsprachigkeit der Exports (Deutsch wie der Report).
+- Keine Bearbeitung des Reports vor Export (read-only).
+- Picsart-Bildgenerierung erzeugt einzelne Bilder on-demand, keine automatische Vollserie.
+
+## Reihenfolge der Implementierung
+1. DB-Migration (`started_at`, `completed_at`, `models_used`, `generated_images`)
+2. Orchestrator-Patch (Timestamps + models_used)
+3. Edge Function `generate-analysis-image`
+4. Edge Function `export-analysis-report`
+5. Frontend: Hook + Dialog + Auto-Open + Buttons

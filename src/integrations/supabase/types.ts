@@ -82,13 +82,16 @@ export type Database = {
       }
       analysis_runs: {
         Row: {
+          completed_at: string | null
           created_at: string
           current_phase: string
           design_blueprint: Json | null
           error: string | null
           file_paths: string[]
           final_report: string | null
+          generated_images: Json
           id: string
+          models_used: Json
           phase_status: Json
           plan_id: string | null
           plan_key: string | null
@@ -97,19 +100,23 @@ export type Database = {
           reference_ids: string[]
           standards_request_id: string | null
           standards_validation: Json | null
+          started_at: string | null
           status: string
           updated_at: string
           user_id: string
           verification_blueprint: Json | null
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string
           current_phase?: string
           design_blueprint?: Json | null
           error?: string | null
           file_paths?: string[]
           final_report?: string | null
+          generated_images?: Json
           id?: string
+          models_used?: Json
           phase_status?: Json
           plan_id?: string | null
           plan_key?: string | null
@@ -118,19 +125,23 @@ export type Database = {
           reference_ids?: string[]
           standards_request_id?: string | null
           standards_validation?: Json | null
+          started_at?: string | null
           status?: string
           updated_at?: string
           user_id: string
           verification_blueprint?: Json | null
         }
         Update: {
+          completed_at?: string | null
           created_at?: string
           current_phase?: string
           design_blueprint?: Json | null
           error?: string | null
           file_paths?: string[]
           final_report?: string | null
+          generated_images?: Json
           id?: string
+          models_used?: Json
           phase_status?: Json
           plan_id?: string | null
           plan_key?: string | null
@@ -139,6 +150,7 @@ export type Database = {
           reference_ids?: string[]
           standards_request_id?: string | null
           standards_validation?: Json | null
+          started_at?: string | null
           status?: string
           updated_at?: string
           user_id?: string
