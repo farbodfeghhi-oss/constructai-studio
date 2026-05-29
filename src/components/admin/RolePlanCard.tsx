@@ -77,8 +77,6 @@ export function RolePlanCard({ plan, password, onChanged }: { plan: RolePlan; pa
     onChanged();
   };
 
-  const providers = plan.provider_mode.split(/[+\-]/).filter((x) => x === "perplexity" || x === "monica");
-
   return (
     <div className={`relative rounded-xl border p-5 bg-card/60 backdrop-blur transition-all ${plan.is_active ? "border-accent shadow-lg shadow-accent/10" : "border-primary/15 hover:border-primary/40"}`}>
       {plan.is_active && (
@@ -96,12 +94,7 @@ export function RolePlanCard({ plan, password, onChanged }: { plan: RolePlan; pa
           <code className="text-[10px] font-mono text-muted-foreground">{plan.key}</code>
         </div>
         <div className="flex gap-1 flex-shrink-0">
-          {providers.includes("perplexity") && (
-            <Badge variant="outline" className="border-blue-400/40 text-blue-300 text-[10px] gap-1"><Search className="h-2.5 w-2.5" />Perplexity</Badge>
-          )}
-          {providers.includes("monica") && (
-            <Badge variant="outline" className="border-amber-400/40 text-amber-300 text-[10px] gap-1"><Brain className="h-2.5 w-2.5" />Monica</Badge>
-          )}
+          <Badge variant="outline" className="border-blue-400/40 text-blue-300 text-[10px] gap-1"><Search className="h-2.5 w-2.5" />Perplexity</Badge>
         </div>
       </div>
 
