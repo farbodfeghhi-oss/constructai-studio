@@ -4,7 +4,7 @@
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { callAgent, type AgentInputItem } from "../_shared/perplexity/client.ts";
+import { callAgent, callSonar, type AgentInputItem } from "../_shared/perplexity/client.ts";
 import { extractCitations } from "../_shared/perplexity/citations.ts";
 import { ANTI_HALLUCINATION, loadRolePlan } from "../_shared/perplexity/prompts.ts";
 
@@ -62,20 +62,36 @@ Deno.serve(async (req) => {
       ? plan.models.array
       : ["anthropic/claude-opus-4-7", "openai/gpt-5.5"];
 
-    // Agent API content parts: input_text / input_image (image_url is a string).
-    const content: AgentInputItem[] = [{ type: "input_text", text: prompt }];
-    for (const img of normImages) content.push({ type: "input_image", image_url: img.url });
+    // OpenAI-compatible content parts: text + image_url (image_url as object with .url)
+    const content: AgentInputItem[] = [{ type: "text", text: prompt }];
+    for (const img of normImages) content.push({ type: "image_url", image_url: { url: img.url } });
 
-    const resp = await callAgent({
-      models: modelsArray.slice(0, 5),
-      instructions: systemPrompt,
-      input: [{ role: "user", content }],
-      tools: (plan?.tools ?? [{ type: "web_search" }]) as Array<{ type: string }>,
-      max_steps: plan?.max_steps ?? 6,
-    });
+    let resp: any;
+    let modeUsed: "agent" | "sonar-vision";
 
-    // The assistant message may not be at output[0] when web_search ran first.
-    // Walk all output items and pick the last assistant message's output_text.
+    if (normImages.length > 0) {
+      // Multimodal path → sonar-pro on /chat/completions (Agent API rejects image parts).
+      modeUsed = "sonar-vision";
+      resp = await callSonar({
+        model: "sonar-pro",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: content as any },
+        ],
+      });
+    } else {
+      // Text-only path → Agent API with multi-model fallback + web_search.
+      modeUsed = "agent";
+      resp = await callAgent({
+        models: modelsArray.slice(0, 5),
+        instructions: systemPrompt,
+        input: [{ role: "user", content }],
+        tools: (plan?.tools ?? [{ type: "web_search" }]) as Array<{ type: string }>,
+        max_steps: plan?.max_steps ?? 6,
+      });
+    }
+
+    // Extract assistant text from either response shape.
     let text: string = resp?.output_text ?? "";
     if (!text && Array.isArray(resp?.output)) {
       for (const item of resp.output) {
@@ -90,7 +106,8 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       ok: true,
-      model_used: resp?.model ?? modelsArray[0],
+      mode: modeUsed,
+      model_used: resp?.model ?? (modeUsed === "sonar-vision" ? "sonar-pro" : modelsArray[0]),
       content: text,
       citations,
       raw: resp,
