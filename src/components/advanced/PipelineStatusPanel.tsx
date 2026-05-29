@@ -1,12 +1,13 @@
-import { Loader2, CheckCircle2, Circle, AlertTriangle, RotateCw, Layers, Brain, Search, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, AlertTriangle, RotateCw, Layers, Brain, Calculator, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { AnalysisRun, PhaseKey } from "@/hooks/useAnalysisRun";
 
 const PHASES: Array<{ key: PhaseKey; label: string; sub: string; icon: any }> = [
-  { key: "aggregator", label: "Context Aggregator", sub: "Dateien, Referenzen & Prompt ingestieren", icon: Layers },
+  { key: "aggregator", label: "Semantic Context (RAG)", sub: "pplx-embed-v1-4b · cosine · top-K Knowledge-Chunks", icon: Layers },
   { key: "design", label: "Perplexity · Mechanik-Design", sub: "Multimodale Bild-/CAD-Analyse · Claude Opus 4.7 / Sonar Vision", icon: Brain },
+  { key: "verification", label: "Perplexity · Logical Verification", sub: "sonar-reasoning-pro · <think>-CoT · Toleranzen & Physik", icon: Calculator },
   { key: "standards", label: "Perplexity · Normen Deep Research", sub: "sonar-deep-research · academic · ISO/DIN/EN", icon: Search },
   { key: "docgen", label: "Perplexity · Tech Docu Synthesizer", sub: "Sonar Pro · json_schema · Finaler Engineering Report", icon: Sparkles },
 ];
