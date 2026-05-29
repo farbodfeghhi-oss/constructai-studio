@@ -376,26 +376,31 @@ Deno.serve(async (req) => {
         try {
           if (phase === "aggregator") {
             aggregated = await withRetry(() => aggregator(run_id));
+            await recordModel(run_id, "aggregator", `${RAG_QUERY_MODEL} + match_knowledge_items`);
           } else if (phase === "design") {
             if (!aggregated) aggregated = await aggregator(run_id);
             design = await withRetry(() => designPhase(aggregated!));
             await updateRun(run_id, { design_blueprint: design });
+            await recordModel(run_id, "design", design?.model_used);
           } else if (phase === "verification") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design) throw new Error("Missing design blueprint");
             verification = await withRetry(() => verificationPhase(aggregated!, design));
             await updateRun(run_id, { verification_blueprint: verification });
+            await recordModel(run_id, "verification", verification?.model_used ?? "sonar-reasoning-pro");
           } else if (phase === "standards") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design) throw new Error("Missing design blueprint");
             if (!verification) throw new Error("Missing verification blueprint");
             await standardsSubmit(run_id, design, verification, aggregated);
+            await recordModel(run_id, "standards", "sonar-deep-research");
             return; // Ticker continues asynchronously and re-enters at docgen.
           } else if (phase === "docgen") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design || !verification || !standards) throw new Error("Missing prior phases");
             const report = await withRetry(() => docgenPhase(aggregated!, design, verification, standards));
             await updateRun(run_id, { final_report: report });
+            await recordModel(run_id, "docgen", "sonar-pro");
           }
           await setPhase(run_id, phase, "done");
         } catch (e) {
