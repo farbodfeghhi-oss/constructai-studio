@@ -39,6 +39,15 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+    // Snapshot the currently active AI role plan onto the run.
+    const { data: activePlan } = await admin
+      .from("ai_role_plans")
+      .select("id, key, name")
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     const { data: run, error: insErr } = await admin
       .from("analysis_runs")
       .insert({
@@ -48,6 +57,9 @@ Deno.serve(async (req) => {
         file_paths,
         status: "queued",
         current_phase: "aggregator",
+        plan_id: activePlan?.id ?? null,
+        plan_key: activePlan?.key ?? null,
+        plan_name: activePlan?.name ?? null,
       })
       .select()
       .single();

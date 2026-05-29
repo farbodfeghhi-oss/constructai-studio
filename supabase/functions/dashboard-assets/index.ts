@@ -69,14 +69,19 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const force = body?.force === true;
+    const onlyKeys: string[] | null = Array.isArray(body?.keys) && body.keys.length > 0
+      ? body.keys.filter((k: unknown): k is string => typeof k === "string")
+      : null;
 
     const admin = createClient(url, srv);
     const { data: existing } = await admin.from("dashboard_assets").select("key, image_url").eq("user_id", user.id);
     const have = new Map((existing ?? []).map((r: any) => [r.key, r.image_url]));
 
+    const targetAssets = onlyKeys ? ASSETS.filter((a) => onlyKeys.includes(a.key)) : ASSETS;
     const results: Record<string, string> = {};
-    for (const a of ASSETS) {
-      if (!force && have.has(a.key)) {
+    for (const a of targetAssets) {
+      const forceThis = force || (onlyKeys !== null);
+      if (!forceThis && have.has(a.key)) {
         results[a.key] = have.get(a.key) as string;
         continue;
       }
