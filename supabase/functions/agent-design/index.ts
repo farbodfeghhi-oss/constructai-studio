@@ -52,7 +52,8 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    for (const img of images) validateImage(img);
+    const normImages = (images as any[]).map(normalizeImage);
+    for (const img of normImages) validateImage(img);
 
     const plan = (await loadRolePlan(admin, plan_key ?? "mech_design_agent")) ?? null;
     const systemPrompt = (plan?.system_prompt ?? "") + "\n\n" + ANTI_HALLUCINATION;
@@ -61,8 +62,9 @@ Deno.serve(async (req) => {
       ? plan.models.array
       : ["anthropic/claude-opus-4-7", "openai/gpt-5.5"];
 
-    const content: AgentInputItem[] = [{ type: "text", text: prompt }];
-    for (const img of images) content.push({ type: "image_url", image_url: { url: img.url } });
+    // Agent API content parts: input_text / input_image (image_url is a string).
+    const content: AgentInputItem[] = [{ type: "input_text", text: prompt }];
+    for (const img of normImages) content.push({ type: "input_image", image_url: img.url });
 
     const resp = await callAgent({
       models: modelsArray.slice(0, 5),
@@ -72,10 +74,12 @@ Deno.serve(async (req) => {
       max_steps: plan?.max_steps ?? 6,
     });
 
+    // Output: response.output[0].content[0].text (type: "output_text")
     const text =
       resp?.output_text ??
-      resp?.choices?.[0]?.message?.content ??
+      resp?.output?.[0]?.content?.find?.((c: any) => c.type === "output_text")?.text ??
       resp?.output?.[0]?.content?.[0]?.text ??
+      resp?.choices?.[0]?.message?.content ??
       "";
     const citations = extractCitations(resp);
 
