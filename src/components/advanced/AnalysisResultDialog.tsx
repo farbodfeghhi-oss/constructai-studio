@@ -57,6 +57,7 @@ export function AnalysisResultDialog({
   run, open, onOpenChange,
 }: { run: AnalysisRun | null; open: boolean; onOpenChange: (b: boolean) => void }) {
   const [generating, setGenerating] = useState<ImageKind | null>(null);
+  const [verifyingIdx, setVerifyingIdx] = useState<number | null>(null);
   const [exporting, setExporting] = useState<"pdf" | "docx" | "html" | null>(null);
 
   const allCitations = useMemo(() => (run ? collectAllCitations(run) : []), [run]);
