@@ -14,6 +14,16 @@ import { toast } from "@/hooks/use-toast";
 
 export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
   const reportRef = useRef<HTMLDivElement>(null);
+  const { job, submit, submitting } = useDeepResearchJob();
+
+  const runDeepStandards = async () => {
+    if (!run?.monica_report) return;
+    const res = await submit(
+      `Prüfe folgenden Engineering-Report tiefgehend gegen aktuelle Normen (DIN, EN, ISO, IEC, ASME). Liefere konkrete Verstöße, Konformitäts-Status und Korrekturmaßnahmen.\n\nREPORT:\n${run.monica_report.slice(0, 8000)}`,
+    );
+    if (res) toast({ title: "Deep Research gestartet", description: "Async Job · Polling alle 5s (TTL 7 Tage)." });
+  };
+
 
   const exportPdf = async () => {
     if (!reportRef.current) return;
