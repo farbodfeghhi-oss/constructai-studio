@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Trophy, Coins, Zap, Wrench, ArrowLeft, History, Trash2, FileText, Search, Wand2, Download, Copy, Check, Image as ImageIcon } from "lucide-react";
-import { ProviderSelect, type AIProvider, type MonicaModel } from "@/components/ProviderSelect";
+// ProviderSelect removed — Phase 8: pipeline is 100% Perplexity (Multi-Agent).
 import { RichMediaInput } from "@/components/RichMediaInput";
 import { type Attachment } from "@/components/AttachmentPreview";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -144,7 +144,7 @@ const PICSART_DOCS: { type: PicsartDocType; label: string; emoji: string }[] = [
   { type: "praesentation", label: "Präsentation", emoji: "📊" },
 ];
 
-function SolutionActions({ loesung, provider, model, projektName }: { loesung: Loesung; provider: AIProvider; model?: MonicaModel; projektName?: string }) {
+function SolutionActions({ loesung, projektName }: { loesung: Loesung; projektName?: string }) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [deepAnalysis, setDeepAnalysis] = useState<DeepAnalysis | null>(null);
   const [techPrompts, setTechPrompts] = useState<TechnicalPrompts | null>(null);
@@ -257,7 +257,7 @@ function SolutionActions({ loesung, provider, model, projektName }: { loesung: L
     setLoadingAction("export");
     try {
       const { data, error } = await supabase.functions.invoke("generate-document", {
-        body: { loesung, format: exportFormat, provider, model, projektName },
+        body: { loesung, format: exportFormat, projektName },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -400,7 +400,7 @@ function SolutionActions({ loesung, provider, model, projektName }: { loesung: L
   );
 }
 
-function LoesungCard({ loesung, provider, model, projektName }: { loesung: Loesung; provider: AIProvider; model?: MonicaModel; projektName?: string }) {
+function LoesungCard({ loesung, projektName }: { loesung: Loesung; projektName?: string }) {
   return (
     <div className="space-y-4">
       <Card>
@@ -475,7 +475,7 @@ function LoesungCard({ loesung, provider, model, projektName }: { loesung: Loesu
         </Card>
       )}
 
-      <SolutionActions loesung={loesung} provider={provider} model={model} projektName={projektName} />
+      <SolutionActions loesung={loesung} projektName={projektName} />
     </div>
   );
 }
@@ -523,8 +523,7 @@ export default function Loesung() {
   const [isLoading, setIsLoading] = useState(false);
   const [loesungen, setLoesungen] = useState<Loesung[]>([]);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
-  const [provider, setProvider] = useState<AIProvider>("monica");
-  const [monicaModel, setMonicaModel] = useState<MonicaModel>("gpt-4o");
+  // Provider/model selection removed — backend exclusively uses Perplexity (Multi-Agent).
   const [activeTab, setActiveTab] = useState("new");
   const [history, setHistory] = useState<SavedSolution[]>([]);
   const [selectedHistory, setSelectedHistory] = useState<SavedSolution | null>(null);
@@ -550,7 +549,7 @@ export default function Loesung() {
       user_id: user.id,
       projekt_name: projektName || null,
       anforderungen,
-      provider,
+      provider: "perplexity",
       loesungen: loesungenData as any,
       raw_response: rawResp,
     } as any);
@@ -666,7 +665,9 @@ export default function Loesung() {
                   <div className="flex-1 min-w-[200px]">
                     <Input placeholder="Projektname (optional)" value={projektName} onChange={(e) => setProjektName(e.target.value)} />
                   </div>
-                  <ProviderSelect value={provider} onChange={setProvider} monicaModel={monicaModel} onMonicaModelChange={setMonicaModel} className="w-[160px]" />
+                  <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-blue-400/30 bg-blue-400/5 text-xs font-mono text-blue-200">
+                    🔍 Powered by Perplexity (Multi-Agent)
+                  </div>
                 </div>
                 <Textarea
                   placeholder="Beschreiben Sie Ihre Anforderungen: Funktion, Belastung, Material, Abmessungen, Einsatzbereich…"
@@ -708,7 +709,7 @@ export default function Loesung() {
               </TabsList>
               {displayLoesungen.map((l) => (
                 <TabsContent key={l.typ} value={l.typ}>
-                  <LoesungCard loesung={l} provider={provider} model={provider === "monica" ? monicaModel : undefined} projektName={projektName} />
+                  <LoesungCard loesung={l} projektName={projektName} />
                 </TabsContent>
               ))}
             </Tabs>

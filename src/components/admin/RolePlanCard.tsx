@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Edit3, Loader2, Save, X, Search, Brain, Image as ImageIcon, Zap, Database, FileJson, Globe } from "lucide-react";
+import { CheckCircle2, Edit3, Loader2, Save, X, Search, Image as ImageIcon, Zap, Database, FileJson, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
