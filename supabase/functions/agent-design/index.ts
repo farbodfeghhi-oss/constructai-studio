@@ -62,9 +62,9 @@ Deno.serve(async (req) => {
       ? plan.models.array
       : ["anthropic/claude-opus-4-7", "openai/gpt-5.5"];
 
-    // Agent API content parts: input_text / input_image (image_url is a string).
-    const content: AgentInputItem[] = [{ type: "input_text", text: prompt }];
-    for (const img of normImages) content.push({ type: "input_image", image_url: img.url });
+    // OpenAI-compatible content parts: text + image_url (image_url as object with .url)
+    const content: AgentInputItem[] = [{ type: "text", text: prompt }];
+    for (const img of normImages) content.push({ type: "image_url", image_url: { url: img.url } });
 
     const resp = await callAgent({
       models: modelsArray.slice(0, 5),
