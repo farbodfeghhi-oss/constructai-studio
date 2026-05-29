@@ -29,6 +29,17 @@ export function extractCitations(response: any): SearchResult[] {
     }
   }
 
+  // Agent API: per-step results inside response.output[].results
+  if (Array.isArray(response.output)) {
+    for (const step of response.output) {
+      if (Array.isArray(step?.results)) {
+        for (const r of step.results) {
+          if (r?.url) out.push({ url: r.url, title: r.title, snippet: r.snippet, date: r.date });
+        }
+      }
+    }
+  }
+
   // Legacy: citations as URL strings
   if (Array.isArray(response.citations)) {
     for (const c of response.citations) {
