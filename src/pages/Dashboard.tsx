@@ -25,7 +25,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
           <span>MechAI v1.0</span>
           <span>·</span>
-          <span>Perplexity · Monica · Picsart</span>
+          <span>Powered by Perplexity (Multi-Agent) · Picsart</span>
           <span>·</span>
           <span>DIN / ISO / EN</span>
           <span>·</span>

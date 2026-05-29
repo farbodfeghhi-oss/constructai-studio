@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Brain, Search, Sparkles, ShieldCheck } from "lucide-react";
+import { Search, Sparkles, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface Plan { id: string; name: string; description: string; provider_mode: string; }
@@ -35,11 +35,7 @@ export function AiModelsBar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-blue-400/30 bg-blue-400/5">
             <Search className="h-4 w-4 text-blue-300" />
-            <span className="text-xs font-mono text-blue-200">Perplexity</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-amber-400/30 bg-amber-400/5">
-            <Brain className="h-4 w-4 text-amber-300" />
-            <span className="text-xs font-mono text-amber-200">Monica</span>
+            <span className="text-xs font-mono text-blue-200">Powered by Perplexity</span>
           </div>
           <Link
             to="/ai-roles"
