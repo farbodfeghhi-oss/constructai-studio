@@ -237,6 +237,28 @@ ${sources}
     } finally { setGenerating(null); }
   };
 
+  const verifyImage = async (index: number) => {
+    setVerifyingIdx(index);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-analysis-image", {
+        body: { run_id: run.id, image_index: index },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data.verdict === "ok") {
+        toast({ title: "Prüfung bestanden", description: data.notes || "Bild stimmt mit Report überein." });
+      } else {
+        toast({
+          title: data.new_image ? "Revision erstellt" : "Prüfung: Korrektur nötig",
+          description: data.new_image ? "Neues, korrigiertes Bild wurde generiert." : (data.notes || "Bild weicht ab."),
+        });
+      }
+    } catch (e: any) {
+      toast({ title: "Prüfung fehlgeschlagen", description: e?.message ?? String(e), variant: "destructive" });
+    } finally { setVerifyingIdx(null); }
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[1400px] w-[96vw] h-[92vh] p-0 flex flex-col gap-0">
