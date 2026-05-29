@@ -528,21 +528,39 @@ export default function Loesung() {
     setSelectedHistory(null);
 
     try {
-      const images = attachments.filter((a) => a.type === "image").map((a) => a.dataUrl);
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase.functions.invoke("generate-solutions", {
-        body: { projektName, anforderungen, provider, model: provider === "monica" ? monicaModel : undefined, images, userId: user?.id },
+      const images = attachments
+        .filter((a) => a.type === "image")
+        .map((a) => ({ url: a.dataUrl }));
+
+      const userPrompt = projektName
+        ? `Projekt: ${projektName}\n\nAnforderungen:\n${anforderungen}`
+        : anforderungen;
+
+      // v2: agent-design (Perplexity Agent API · multimodal · multi-model fallback)
+      const { data, error } = await supabase.functions.invoke("agent-design", {
+        body: { prompt: userPrompt, images, plan_key: "mech_design_agent" },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      if (data?.loesungen) {
-        setLoesungen(data.loesungen);
-        toast({ title: "Lösungen generiert", description: `${data.loesungen.length} Varianten erstellt.` });
-        await saveSolution(data.loesungen, null);
-      } else if (data?.rawResponse) {
-        setRawResponse(data.rawResponse);
-        await saveSolution([], data.rawResponse);
+      const content: string = data?.content ?? "";
+      let parsed: { loesungen?: Loesung[] } | null = null;
+      // Strict JSON first, then fall back to first {...} block from markdown.
+      try { parsed = JSON.parse(content); } catch {
+        const m = content.match(/\{[\s\S]*\}/);
+        if (m) { try { parsed = JSON.parse(m[0]); } catch { parsed = null; } }
+      }
+
+      if (parsed?.loesungen?.length) {
+        setLoesungen(parsed.loesungen);
+        toast({
+          title: "Lösungen generiert",
+          description: `${parsed.loesungen.length} Varianten · ${data?.mode === "sonar-vision" ? "Multimodal (Sonar Vision)" : "Agent API"}`,
+        });
+        await saveSolution(parsed.loesungen, null);
+      } else {
+        setRawResponse(content || "(keine Antwort)");
+        await saveSolution([], content);
       }
     } catch (err: any) {
       toast({ title: "Fehler", description: err.message || "Generierung fehlgeschlagen", variant: "destructive" });
