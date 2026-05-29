@@ -53,8 +53,9 @@ Deno.serve(async (req) => {
     }
 
     const updates = await Promise.all(items.map((it, i) => {
-      const vec = emb.data.find((d) => d.index === i)?.embedding ?? emb.data[i]?.embedding;
-      if (!vec || vec.length !== 2560) throw new Error(`Unerwartete Vektor-Länge: ${vec?.length}`);
+      const raw = emb.data.find((d) => d.index === i)?.embedding ?? emb.data[i]?.embedding;
+      const vec = raw != null ? decodeEmbedding(raw) : null;
+      if (!vec || vec.length !== EXPECTED_DIM) throw new Error(`Unerwartete Vektor-Länge: ${vec?.length}`);
       const vectorLiteral = `[${vec.join(",")}]`;
       return admin.from("knowledge_items")
         .update({ embedding: vectorLiteral, embedding_model: DOC_MODEL })
