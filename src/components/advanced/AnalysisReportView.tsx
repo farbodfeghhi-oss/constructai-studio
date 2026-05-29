@@ -126,6 +126,40 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
             </div>
           ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Validierung…</p>}
         </TabsContent>
+
+        <TabsContent value="standards" className="flex-1 overflow-auto px-4 pb-4 mt-0">
+          {!job ? (
+            <p className="text-sm text-muted-foreground p-4">
+              Klicke „Normen Deep Research", um eine asynchrone Tiefen-Recherche (sonar-deep-research, search_mode=academic, gefiltert auf iso.org/din.de/beuth.de/cen.eu) gegen den finalen Report zu starten.
+            </p>
+          ) : job.status === "completed" && job.result ? (
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{(job.result as any).content ?? ""}</ReactMarkdown>
+              {job.citations?.length > 0 && (
+                <div className="mt-4 not-prose">
+                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Quellen ({job.citations.length})</h4>
+                  <ul className="text-xs space-y-1">
+                    {job.citations.map((c: any, i: number) => (
+                      <li key={i}>
+                        <a href={c.url ?? c} target="_blank" rel="noreferrer" className="text-accent hover:underline break-all">
+                          {c.title ?? c.url ?? String(c)}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : job.status === "failed" ? (
+            <p className="text-sm text-destructive p-4">Deep Research fehlgeschlagen: {job.error}</p>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground p-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Deep Research läuft… (Polling alle 5s · TTL 7 Tage)
+            </div>
+          )}
+        </TabsContent>
+
       </Tabs>
     </div>
   );
