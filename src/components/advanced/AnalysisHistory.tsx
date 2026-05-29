@@ -10,6 +10,7 @@ interface RunRow {
   prompt: string;
   status: "queued" | "running" | "done" | "error";
   created_at: string;
+  plan_name: string | null;
 }
 
 interface Props {
@@ -24,7 +25,7 @@ export function AnalysisHistory({ currentRunId, onSelect }: Props) {
   const load = async () => {
     const { data } = await supabase
       .from("analysis_runs")
-      .select("id, prompt, status, created_at")
+      .select("id, prompt, status, created_at, plan_name")
       .order("created_at", { ascending: false })
       .limit(50);
     setRuns((data as RunRow[]) || []);
@@ -84,6 +85,11 @@ export function AnalysisHistory({ currentRunId, onSelect }: Props) {
                   <div className="text-[10px] text-muted-foreground font-mono mt-1">
                     {new Date(r.created_at).toLocaleString("de-DE")}
                   </div>
+                  {r.plan_name && (
+                    <div className="mt-1 inline-block text-[9px] font-mono px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
+                      {r.plan_name}
+                    </div>
+                  )}
                 </div>
               </div>
             </button>

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type DashboardAssets = Record<string, string>;
+const NEEDED = ["hero", "cap_loesung", "cap_analysis", "cap_knowledge", "cap_components", "cap_docs", "cap_roles"];
 
 export function useDashboardAssets() {
   const [assets, setAssets] = useState<DashboardAssets>({});
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [regeneratingKeys, setRegeneratingKeys] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -18,9 +20,7 @@ export function useDashboardAssets() {
     setAssets(map);
     setLoading(false);
 
-    // Trigger background generation for missing keys
-    const needed = ["hero", "cap_loesung", "cap_analysis", "cap_knowledge", "cap_components", "cap_docs", "cap_roles"];
-    const missing = needed.some((k) => !map[k]);
+    const missing = NEEDED.some((k) => !map[k]);
     if (missing) {
       setGenerating(true);
       supabase.functions.invoke("dashboard-assets", { body: {} }).then(({ data: res }) => {
@@ -33,10 +33,25 @@ export function useDashboardAssets() {
 
   const regenerate = useCallback(async () => {
     setGenerating(true);
-    const { data: res } = await supabase.functions.invoke("dashboard-assets", { body: { force: true } });
-    if (res?.assets) setAssets(res.assets);
-    setGenerating(false);
+    setRegeneratingKeys(new Set(NEEDED));
+    try {
+      const { data: res } = await supabase.functions.invoke("dashboard-assets", { body: { force: true } });
+      if (res?.assets) setAssets(res.assets);
+    } finally {
+      setGenerating(false);
+      setRegeneratingKeys(new Set());
+    }
   }, []);
 
-  return { assets, loading, generating, regenerate };
+  const regenerateKey = useCallback(async (key: string) => {
+    setRegeneratingKeys((prev) => new Set(prev).add(key));
+    try {
+      const { data: res } = await supabase.functions.invoke("dashboard-assets", { body: { keys: [key] } });
+      if (res?.assets?.[key]) setAssets((prev) => ({ ...prev, [key]: res.assets[key] }));
+    } finally {
+      setRegeneratingKeys((prev) => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  }, []);
+
+  return { assets, loading, generating, regenerate, regenerateKey, regeneratingKeys };
 }

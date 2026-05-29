@@ -17,6 +17,9 @@ export interface AnalysisRun {
   perplexity_validation: any;
   monica_report: string | null;
   error: string | null;
+  plan_id: string | null;
+  plan_key: string | null;
+  plan_name: string | null;
   created_at: string;
   updated_at: string;
 }

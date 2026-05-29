@@ -91,6 +91,9 @@ export type Database = {
           monica_report: string | null
           perplexity_validation: Json | null
           phase_status: Json
+          plan_id: string | null
+          plan_key: string | null
+          plan_name: string | null
           prompt: string
           reference_ids: string[]
           status: string
@@ -107,6 +110,9 @@ export type Database = {
           monica_report?: string | null
           perplexity_validation?: Json | null
           phase_status?: Json
+          plan_id?: string | null
+          plan_key?: string | null
+          plan_name?: string | null
           prompt: string
           reference_ids?: string[]
           status?: string
@@ -123,6 +129,9 @@ export type Database = {
           monica_report?: string | null
           perplexity_validation?: Json | null
           phase_status?: Json
+          plan_id?: string | null
+          plan_key?: string | null
+          plan_name?: string | null
           prompt?: string
           reference_ids?: string[]
           status?: string
