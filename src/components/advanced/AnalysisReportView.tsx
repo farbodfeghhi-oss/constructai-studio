@@ -1,14 +1,16 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, ShieldCheck, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import type { AnalysisRun } from "@/hooks/useAnalysisRun";
+import { useDeepResearchJob } from "@/hooks/useDeepResearchJob";
+import { toast } from "@/hooks/use-toast";
 
 export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
   const reportRef = useRef<HTMLDivElement>(null);
