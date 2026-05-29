@@ -1,16 +1,29 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { AnalysisInputPanel } from "@/components/advanced/AnalysisInputPanel";
 import { PipelineStatusPanel } from "@/components/advanced/PipelineStatusPanel";
 import { AnalysisReportView } from "@/components/advanced/AnalysisReportView";
 import { AnalysisHistory } from "@/components/advanced/AnalysisHistory";
+import { AnalysisResultDialog } from "@/components/advanced/AnalysisResultDialog";
 import { useAnalysisRun } from "@/hooks/useAnalysisRun";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Maximize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function AdvancedEngineeringAnalysis() {
   const [runId, setRunId] = useState<string | null>(null);
   const { run } = useAnalysisRun(runId);
   const active = run && run.status !== "done" && run.status !== "error";
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const lastAutoOpenedRunId = useRef<string | null>(null);
+
+  // Auto-open the result dialog when a run completes.
+  useEffect(() => {
+    if (run?.status === "done" && run.final_report && lastAutoOpenedRunId.current !== run.id) {
+      lastAutoOpenedRunId.current = run.id;
+      setDialogOpen(true);
+    }
+  }, [run?.status, run?.id, run?.final_report]);
 
   return (
     <div className="h-[calc(100vh-3.5rem)] flex flex-col">
@@ -24,15 +37,22 @@ export default function AdvancedEngineeringAnalysis() {
             <p className="text-[11px] text-muted-foreground uppercase tracking-widest">100% Perplexity · RAG → Design → Verification → Standards → Docgen</p>
           </div>
         </div>
-        {run && (
-          <div className="text-xs font-mono text-muted-foreground">
-            Status: <span className={
-              run.status === "done" ? "text-green-500" :
-              run.status === "error" ? "text-destructive" :
-              "text-accent"
-            }>{run.status.toUpperCase()}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {run?.status === "done" && (
+            <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
+              <Maximize2 className="h-3.5 w-3.5 mr-1.5" /> Ergebnis-Fenster
+            </Button>
+          )}
+          {run && (
+            <div className="text-xs font-mono text-muted-foreground">
+              Status: <span className={
+                run.status === "done" ? "text-green-500" :
+                run.status === "error" ? "text-destructive" :
+                "text-accent"
+              }>{run.status.toUpperCase()}</span>
+            </div>
+          )}
+        </div>
       </header>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -51,6 +71,8 @@ export default function AdvancedEngineeringAnalysis() {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <AnalysisResultDialog run={run} open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }
