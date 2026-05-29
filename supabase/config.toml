@@ -44,3 +44,21 @@ verify_jwt = false
 
 [functions.dashboard-assets]
 verify_jwt = false
+
+[functions.agent-design]
+verify_jwt = false
+
+[functions.agent-standards]
+verify_jwt = false
+
+[functions.agent-standards-poll]
+verify_jwt = false
+
+[functions.agent-docgen]
+verify_jwt = false
+
+[functions.agent-rag-embed]
+verify_jwt = false
+
+[functions.agent-rag-search]
+verify_jwt = false
