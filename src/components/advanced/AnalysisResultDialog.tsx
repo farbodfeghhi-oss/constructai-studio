@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import {
   Download, FileText, FileType2, FileCode, Image as ImageIcon,
   Sparkles, Loader2, Clock, Brain, Database, Paperclip, Quote, Layers,
+  ShieldCheck, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import type { AnalysisRun } from "@/hooks/useAnalysisRun";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +57,7 @@ export function AnalysisResultDialog({
   run, open, onOpenChange,
 }: { run: AnalysisRun | null; open: boolean; onOpenChange: (b: boolean) => void }) {
   const [generating, setGenerating] = useState<ImageKind | null>(null);
+  const [verifyingIdx, setVerifyingIdx] = useState<number | null>(null);
   const [exporting, setExporting] = useState<"pdf" | "docx" | "html" | null>(null);
 
   const allCitations = useMemo(() => (run ? collectAllCitations(run) : []), [run]);
@@ -235,6 +237,28 @@ ${sources}
     } finally { setGenerating(null); }
   };
 
+  const verifyImage = async (index: number) => {
+    setVerifyingIdx(index);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-analysis-image", {
+        body: { run_id: run.id, image_index: index },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data.verdict === "ok") {
+        toast({ title: "Prüfung bestanden", description: data.notes || "Bild stimmt mit Report überein." });
+      } else {
+        toast({
+          title: data.new_image ? "Revision erstellt" : "Prüfung: Korrektur nötig",
+          description: data.new_image ? "Neues, korrigiertes Bild wurde generiert." : (data.notes || "Bild weicht ab."),
+        });
+      }
+    } catch (e: any) {
+      toast({ title: "Prüfung fehlgeschlagen", description: e?.message ?? String(e), variant: "destructive" });
+    } finally { setVerifyingIdx(null); }
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[1400px] w-[96vw] h-[92vh] p-0 flex flex-col gap-0">
@@ -296,17 +320,54 @@ ${sources}
                     Bilder werden von Picsart auf Basis des Reports generiert (1024×1024, ~30–60 s).
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(run.generated_images ?? []).map((img, i) => (
-                      <figure key={i} className="rounded-md border border-border overflow-hidden bg-card">
-                        <img src={img.url} alt={img.label ?? img.kind} className="w-full h-auto" />
-                        <figcaption className="p-2 text-xs flex items-center justify-between">
-                          <span className="font-medium">{img.label ?? img.kind}</span>
-                          <a href={img.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                            <Download className="h-3 w-3 inline" />
-                          </a>
-                        </figcaption>
-                      </figure>
-                    ))}
+                    {(run.generated_images ?? []).map((img: any, i) => {
+                      const v = img.verification;
+                      const isRevision = typeof img.revised_from === "number";
+                      return (
+                        <figure key={i} className="rounded-md border border-border overflow-hidden bg-card flex flex-col">
+                          <img src={img.url} alt={img.label ?? img.kind} className="w-full h-auto" />
+                          <figcaption className="p-2 text-xs space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium truncate">{img.label ?? img.kind}</span>
+                              <a href={img.url} target="_blank" rel="noreferrer" className="text-accent hover:underline shrink-0">
+                                <Download className="h-3 w-3 inline" />
+                              </a>
+                            </div>
+                            {isRevision && (
+                              <Badge variant="secondary" className="text-[10px]">Revision von Bild #{(img.revised_from as number) + 1}</Badge>
+                            )}
+                            {v && (
+                              <div className={`flex items-start gap-1.5 rounded px-2 py-1.5 text-[11px] ${v.verdict === "ok" ? "bg-green-500/10 text-green-300" : "bg-amber-500/10 text-amber-300"}`}>
+                                {v.verdict === "ok"
+                                  ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                  : <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
+                                <div className="space-y-0.5">
+                                  <div className="font-semibold">{v.verdict === "ok" ? "Geprüft & OK" : "Korrektur empfohlen"}</div>
+                                  {v.notes && <div className="opacity-90">{v.notes}</div>}
+                                  {Array.isArray(v.issues) && v.issues.length > 0 && (
+                                    <ul className="list-disc list-inside opacity-80">
+                                      {v.issues.slice(0, 3).map((it: string, j: number) => <li key={j}>{it}</li>)}
+                                    </ul>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-7 text-[11px]"
+                              disabled={verifyingIdx !== null}
+                              onClick={() => verifyImage(i)}
+                            >
+                              {verifyingIdx === i
+                                ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                : <ShieldCheck className="h-3 w-3 mr-1.5" />}
+                              {v ? "Erneut prüfen & verbessern" : "Technische Prüfung & Auto-Verbesserung"}
+                            </Button>
+                          </figcaption>
+                        </figure>
+                      );
+                    })}
                     {(run.generated_images ?? []).length === 0 && (
                       <p className="text-sm text-muted-foreground col-span-full">Noch keine Bilder generiert.</p>
                     )}
