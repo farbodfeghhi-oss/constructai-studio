@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import {
   Download, FileText, FileType2, FileCode, Image as ImageIcon,
   Sparkles, Loader2, Clock, Brain, Database, Paperclip, Quote, Layers,
+  ShieldCheck, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import type { AnalysisRun } from "@/hooks/useAnalysisRun";
 import { supabase } from "@/integrations/supabase/client";
