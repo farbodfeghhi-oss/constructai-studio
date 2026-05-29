@@ -97,8 +97,10 @@ export async function pollDeepResearch(id: string): Promise<AsyncSubmission & { 
 // AGENT API — POST /v1/agent
 // Multi-model fallback (max 5), multimodal (image_url with PNG/JPEG/WEBP/GIF, ≤50MB).
 // ─────────────────────────────────────────────────────────────────────────────
-export type AgentImageInput = { type: "input_image"; image_url: string };
-export type AgentTextInput = { type: "input_text"; text: string };
+// Per Perplexity docs (OpenAI-compatible): content parts use `text` and `image_url` types.
+// image_url is an object: { url: "https://..." | "data:image/...;base64,..." }
+export type AgentImageInput = { type: "image_url"; image_url: { url: string } };
+export type AgentTextInput = { type: "text"; text: string };
 export type AgentInputItem = AgentTextInput | AgentImageInput;
 
 export interface AgentOptions {
