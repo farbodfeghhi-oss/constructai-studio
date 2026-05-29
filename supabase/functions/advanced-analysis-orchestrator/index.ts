@@ -3,7 +3,7 @@
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { submitDeepResearch, pollDeepResearch } from "../_shared/perplexity/client.ts";
+import { submitDeepResearch } from "../_shared/perplexity/client.ts";
 import { extractCitations } from "../_shared/perplexity/citations.ts";
 import { ANTI_HALLUCINATION, loadRolePlan } from "../_shared/perplexity/prompts.ts";
 
@@ -127,8 +127,8 @@ async function designPhase(ctx: Aggregated) {
   };
 }
 
-// ─── Phase: Standards (Deep Research async, inline submit + poll) ────────────
-async function standardsPhase(designBlueprint: any, ctx: Aggregated) {
+// ─── Phase: Standards (Submit only — polling lives in standards-tick) ────────
+async function standardsSubmit(runId: string, designBlueprint: any, ctx: Aggregated) {
   const plan = await loadRolePlan(admin, "standards_deep_research");
   const systemPrompt = (plan?.system_prompt ?? "") + "\n\n" + ANTI_HALLUCINATION;
   const model = plan?.models?.primary ?? "sonar-deep-research";
@@ -159,28 +159,16 @@ Liefere strukturiert (Markdown): 1) Standards-Validierung mit Konformitätsstatu
     search_mode: plan?.search_mode ?? "academic",
   });
 
-  // Poll with backoff up to ~25 min.
-  const deadline = Date.now() + 25 * 60 * 1000;
-  let delay = 5000;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, delay));
-    const polled = await pollDeepResearch(submission.id);
-    const upstream = String(polled.status ?? "").toUpperCase();
-    if (upstream === "COMPLETED") {
-      const resp = (polled as any).response ?? polled;
-      return {
-        content: resp?.choices?.[0]?.message?.content ?? "",
-        citations: extractCitations(resp),
-        request_id: submission.id,
-      };
-    }
-    if (upstream === "FAILED") {
-      throw new Error(`Deep Research FAILED: ${(polled as any).error ?? "unknown"}`);
-    }
-    delay = Math.min(delay + 2000, 15000);
-  }
-  throw new Error("Deep Research timeout (25 min)");
+  await updateRun(runId, { standards_request_id: submission.id });
+
+  // Fire-and-forget kick the ticker; it self-chains every ~10s.
+  fetch(`${SUPABASE_URL}/functions/v1/advanced-analysis-standards-tick`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${SERVICE_ROLE}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ run_id: runId }),
+  }).catch((e) => console.error("tick kickoff:", e));
 }
+
 
 // ─── Phase: Docgen (agent-docgen via sonar-pro + json_schema) ────────────────
 const FINAL_REPORT_SCHEMA = {
@@ -289,8 +277,10 @@ Deno.serve(async (req) => {
           } else if (phase === "standards") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design) throw new Error("Missing design blueprint");
-            standards = await standardsPhase(design, aggregated);
-            await updateRun(run_id, { standards_validation: standards });
+            // Submit Deep Research, then exit. The ticker takes over polling.
+            await standardsSubmit(run_id, design, aggregated);
+            // Leave standards as "running"; ticker advances it and re-invokes orchestrator with start_phase=docgen.
+            return;
           } else if (phase === "docgen") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design || !standards) throw new Error("Missing prior phases");
@@ -298,6 +288,7 @@ Deno.serve(async (req) => {
             await updateRun(run_id, { final_report: report });
           }
           await setPhase(run_id, phase, "done");
+
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.error(`Phase ${phase} failed:`, msg);

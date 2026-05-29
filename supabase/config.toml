@@ -30,6 +30,9 @@ verify_jwt = false
 [functions.advanced-analysis-orchestrator]
 verify_jwt = false
 
+[functions.advanced-analysis-standards-tick]
+verify_jwt = false
+
 [functions.advanced-analysis-retry]
 verify_jwt = false
 
