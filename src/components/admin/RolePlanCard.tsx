@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Edit3, Loader2, Save, X, Search, Brain } from "lucide-react";
+import { CheckCircle2, Edit3, Loader2, Save, X, Search, Brain, Image as ImageIcon, Zap, Database, FileJson, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -12,9 +12,17 @@ export interface RolePlan {
   name: string;
   description: string;
   provider_mode: string;
-  models: Record<string, string>;
+  models: Record<string, any>;
   system_prompt: string;
   is_active: boolean;
+  api_mode?: string;
+  endpoint?: string | null;
+  search_domain_filter?: string[];
+  search_mode?: string | null;
+  response_format?: any;
+  tools?: any[];
+  max_steps?: number | null;
+  supports_multimodal?: boolean;
 }
 
 export function RolePlanCard({ plan, password, onChanged }: { plan: RolePlan; password: string; onChanged: () => void }) {
