@@ -26,16 +26,28 @@ async function updateRun(runId: string, patch: Record<string, unknown>) {
   await admin.from("analysis_runs").update(patch).eq("id", runId);
 }
 
+async function recordModel(runId: string, phase: Phase, model: string | null | undefined) {
+  if (!model) return;
+  const { data } = await admin.from("analysis_runs").select("models_used").eq("id", runId).single();
+  const m = (data?.models_used as Record<string, unknown>) ?? {};
+  m[phase] = model;
+  await admin.from("analysis_runs").update({ models_used: m }).eq("id", runId);
+}
+
 async function setPhase(runId: string, phase: Phase, status: string, error?: string) {
-  const { data } = await admin.from("analysis_runs").select("phase_status").eq("id", runId).single();
+  const { data } = await admin.from("analysis_runs").select("phase_status, started_at").eq("id", runId).single();
   const ps = (data?.phase_status as Record<string, unknown>) ?? {};
   ps[phase] = { status, ...(error ? { error } : {}) };
-  await admin.from("analysis_runs").update({
+  const isDone = phase === "docgen" && status === "done";
+  const patch: Record<string, unknown> = {
     phase_status: ps,
-    current_phase: phase,
-    status: status === "error" ? "error" : (phase === "docgen" && status === "done") ? "done" : "running",
+    current_phase: isDone ? "done" : phase,
+    status: status === "error" ? "error" : isDone ? "done" : "running",
     ...(error ? { error } : {}),
-  }).eq("id", runId);
+  };
+  if (!data?.started_at && status === "running") patch.started_at = new Date().toISOString();
+  if (status === "error" || isDone) patch.completed_at = new Date().toISOString();
+  await admin.from("analysis_runs").update(patch).eq("id", runId);
 }
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
