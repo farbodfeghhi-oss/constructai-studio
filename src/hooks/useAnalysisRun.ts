@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type PhaseKey = "aggregator" | "gemini" | "perplexity" | "monica";
+export type PhaseKey = "aggregator" | "design" | "standards" | "docgen";
 export type PhaseState = { status: "pending" | "running" | "done" | "error"; error?: string };
 
 export interface AnalysisRun {
@@ -13,9 +13,9 @@ export interface AnalysisRun {
   status: "queued" | "running" | "done" | "error";
   current_phase: PhaseKey | "done";
   phase_status: Record<PhaseKey, PhaseState>;
-  gemini_blueprint: any;
-  perplexity_validation: any;
-  monica_report: string | null;
+  design_blueprint: any;
+  standards_validation: any;
+  final_report: string | null;
   error: string | null;
   plan_id: string | null;
   plan_key: string | null;

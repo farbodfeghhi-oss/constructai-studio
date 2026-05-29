@@ -6,9 +6,9 @@ import type { AnalysisRun, PhaseKey } from "@/hooks/useAnalysisRun";
 
 const PHASES: Array<{ key: PhaseKey; label: string; sub: string; icon: any }> = [
   { key: "aggregator", label: "Context Aggregator", sub: "Dateien, Referenzen & Prompt ingestieren", icon: Layers },
-  { key: "gemini", label: "Gemini · Deep Parser", sub: "Multimodale CAD-/PDF-Analyse & Blueprint", icon: Brain },
-  { key: "perplexity", label: "Perplexity · Validator", sub: "Standards & Real-time Validierung", icon: Search },
-  { key: "monica", label: "Monica · Synthesizer", sub: "Finaler Engineering Report", icon: Sparkles },
+  { key: "design", label: "Perplexity · Mechanik-Design", sub: "Multimodale Bild-/CAD-Analyse · Claude Opus 4.7 / Sonar Vision", icon: Brain },
+  { key: "standards", label: "Perplexity · Normen Deep Research", sub: "sonar-deep-research · academic · ISO/DIN/EN", icon: Search },
+  { key: "docgen", label: "Perplexity · Tech Docu Synthesizer", sub: "Sonar Pro · json_schema · Finaler Engineering Report", icon: Sparkles },
 ];
 
 export function PipelineStatusPanel({ run }: { run: AnalysisRun | null }) {

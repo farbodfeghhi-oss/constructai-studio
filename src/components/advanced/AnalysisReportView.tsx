@@ -17,9 +17,9 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
   const { job, submit, submitting } = useDeepResearchJob();
 
   const runDeepStandards = async () => {
-    if (!run?.monica_report) return;
+    if (!run?.final_report) return;
     const res = await submit(
-      `Prüfe folgenden Engineering-Report tiefgehend gegen aktuelle Normen (DIN, EN, ISO, IEC, ASME). Liefere konkrete Verstöße, Konformitäts-Status und Korrekturmaßnahmen.\n\nREPORT:\n${run.monica_report.slice(0, 8000)}`,
+      `Prüfe folgenden Engineering-Report tiefgehend gegen aktuelle Normen (DIN, EN, ISO, IEC, ASME). Liefere konkrete Verstöße, Konformitäts-Status und Korrekturmaßnahmen.\n\nREPORT:\n${run.final_report.slice(0, 8000)}`,
     );
     if (res) toast({ title: "Deep Research gestartet", description: "Async Job · Polling alle 5s (TTL 7 Tage)." });
   };
@@ -73,12 +73,12 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
         <div className="flex items-center justify-between p-4 pb-2 gap-2 flex-wrap">
           <TabsList>
             <TabsTrigger value="final">Final Report</TabsTrigger>
-            <TabsTrigger value="gemini">Gemini Blueprint</TabsTrigger>
-            <TabsTrigger value="perplexity">Validation</TabsTrigger>
+            <TabsTrigger value="design">Mechanik-Design</TabsTrigger>
+            <TabsTrigger value="validation">Normen-Validierung</TabsTrigger>
             <TabsTrigger value="standards">Normen Deep Research</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
-            {run.monica_report && (
+            {run.final_report && (
               <Button size="sm" variant="outline" onClick={runDeepStandards} disabled={submitting || (job?.status === "pending" || job?.status === "in_progress")}>
                 {(submitting || job?.status === "pending" || job?.status === "in_progress")
                   ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -86,7 +86,7 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
                 Normen Deep Research
               </Button>
             )}
-            {run.monica_report && (
+            {run.final_report && (
               <Button size="sm" variant="outline" onClick={exportPdf}>
                 <Download className="h-3.5 w-3.5 mr-1.5" />PDF
               </Button>
@@ -95,44 +95,54 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
         </div>
 
         <TabsContent value="final" className="flex-1 overflow-auto px-4 pb-4 mt-0">
-          {run.monica_report ? (
+          {run.final_report ? (
             <div ref={reportRef} className="prose prose-invert prose-sm max-w-none font-sans
               prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg
               prose-code:font-mono prose-code:text-accent prose-pre:bg-muted/40
               prose-table:text-sm prose-th:bg-muted/50">
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                {run.monica_report}
+                {run.final_report}
               </ReactMarkdown>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground p-4">Wartet auf Monica AI Synthese…</p>
+            <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Tech Docu Synthesizer…</p>
           )}
         </TabsContent>
 
-        <TabsContent value="gemini" className="flex-1 overflow-auto px-4 pb-4 mt-0">
-          {run.gemini_blueprint ? (
-            <pre className="text-xs font-mono bg-muted/30 p-4 rounded whitespace-pre-wrap break-words">
-              {JSON.stringify(run.gemini_blueprint, null, 2)}
-            </pre>
-          ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Gemini Blueprint…</p>}
-        </TabsContent>
-
-        <TabsContent value="perplexity" className="flex-1 overflow-auto px-4 pb-4 mt-0">
-          {run.perplexity_validation ? (
+        <TabsContent value="design" className="flex-1 overflow-auto px-4 pb-4 mt-0">
+          {run.design_blueprint ? (
             <div className="prose prose-invert prose-sm max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.perplexity_validation.content ?? ""}</ReactMarkdown>
-              {run.perplexity_validation.citations?.length > 0 && (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.design_blueprint.content ?? ""}</ReactMarkdown>
+              {run.design_blueprint.citations?.length > 0 && (
                 <div className="mt-4 not-prose">
                   <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Quellen</h4>
                   <ul className="text-xs space-y-1">
-                    {run.perplexity_validation.citations.map((c: string, i: number) => (
-                      <li key={i}><a href={c} target="_blank" rel="noreferrer" className="text-accent hover:underline break-all">{c}</a></li>
+                    {run.design_blueprint.citations.map((c: any, i: number) => (
+                      <li key={i}><a href={typeof c === "string" ? c : c?.url} target="_blank" rel="noreferrer" className="text-accent hover:underline break-all">{typeof c === "string" ? c : (c?.title ?? c?.url)}</a></li>
                     ))}
                   </ul>
                 </div>
               )}
             </div>
-          ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Validierung…</p>}
+          ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Mechanik-Design…</p>}
+        </TabsContent>
+
+        <TabsContent value="validation" className="flex-1 overflow-auto px-4 pb-4 mt-0">
+          {run.standards_validation ? (
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.standards_validation.content ?? ""}</ReactMarkdown>
+              {run.standards_validation.citations?.length > 0 && (
+                <div className="mt-4 not-prose">
+                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Quellen</h4>
+                  <ul className="text-xs space-y-1">
+                    {run.standards_validation.citations.map((c: any, i: number) => (
+                      <li key={i}><a href={typeof c === "string" ? c : c?.url} target="_blank" rel="noreferrer" className="text-accent hover:underline break-all">{typeof c === "string" ? c : (c?.title ?? c?.url)}</a></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Normen Deep Research…</p>}
         </TabsContent>
 
         <TabsContent value="standards" className="flex-1 overflow-auto px-4 pb-4 mt-0">
