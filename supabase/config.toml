@@ -51,6 +51,9 @@ verify_jwt = false
 [functions.agent-design]
 verify_jwt = false
 
+[functions.agent-verification]
+verify_jwt = false
+
 [functions.agent-standards]
 verify_jwt = false
 

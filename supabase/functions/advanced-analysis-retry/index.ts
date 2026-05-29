@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     if (!run || run.user_id !== user.id) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     // Reset phases from given phase onward
-    const PHASES = ["aggregator", "design", "standards", "docgen"];
+    const PHASES = ["aggregator", "design", "verification", "standards", "docgen"];
     const idx = PHASES.indexOf(phase);
     if (idx < 0) return new Response(JSON.stringify({ error: "invalid phase" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 

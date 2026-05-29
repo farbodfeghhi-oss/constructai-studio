@@ -74,6 +74,7 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
           <TabsList>
             <TabsTrigger value="final">Final Report</TabsTrigger>
             <TabsTrigger value="design">Mechanik-Design</TabsTrigger>
+            <TabsTrigger value="verification">Mathematische Verifizierung</TabsTrigger>
             <TabsTrigger value="validation">Normen-Validierung</TabsTrigger>
             <TabsTrigger value="standards">Normen Deep Research</TabsTrigger>
           </TabsList>
@@ -125,6 +126,92 @@ export function AnalysisReportView({ run }: { run: AnalysisRun | null }) {
               )}
             </div>
           ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Mechanik-Design…</p>}
+        </TabsContent>
+
+        <TabsContent value="verification" className="flex-1 overflow-auto px-4 pb-4 mt-0">
+          {run.verification_blueprint ? (
+            <div className="space-y-4">
+              {run.verification_blueprint.thinking && (
+                <details className="rounded-md border border-accent/30 bg-accent/5 p-3">
+                  <summary className="text-xs uppercase tracking-widest text-accent cursor-pointer">
+                    Chain-of-Thought · sonar-reasoning-pro &lt;think&gt;
+                  </summary>
+                  <pre className="mt-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground leading-relaxed">
+                    {run.verification_blueprint.thinking}
+                  </pre>
+                </details>
+              )}
+              {run.verification_blueprint.content && (
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {run.verification_blueprint.content}
+                  </ReactMarkdown>
+                </div>
+              )}
+              {run.verification_blueprint.json && (
+                <div className="space-y-3 not-prose">
+                  {Array.isArray(run.verification_blueprint.json.verified_parameters) && run.verification_blueprint.json.verified_parameters.length > 0 && (
+                    <div>
+                      <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Verifizierte Parameter</h4>
+                      <table className="w-full text-xs border border-border rounded-md overflow-hidden">
+                        <thead className="bg-muted/40">
+                          <tr><th className="text-left p-2">Parameter</th><th className="text-left p-2">Wert</th><th className="text-left p-2">Einheit</th><th className="text-left p-2">OK</th><th className="text-left p-2">Quelle</th></tr>
+                        </thead>
+                        <tbody>
+                          {run.verification_blueprint.json.verified_parameters.map((p: any, i: number) => (
+                            <tr key={i} className="border-t border-border">
+                              <td className="p-2 font-mono">{p.name}</td>
+                              <td className="p-2">{p.value}</td>
+                              <td className="p-2 text-muted-foreground">{p.unit}</td>
+                              <td className="p-2">{p.ok ? "✓" : "✗"}</td>
+                              <td className="p-2 text-muted-foreground">{p.source}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {Array.isArray(run.verification_blueprint.json.warnings) && run.verification_blueprint.json.warnings.length > 0 && (
+                    <div>
+                      <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Warnungen</h4>
+                      <ul className="space-y-1 text-xs">
+                        {run.verification_blueprint.json.warnings.map((w: any, i: number) => (
+                          <li key={i} className="p-2 rounded bg-destructive/5 border border-destructive/20">
+                            <span className="font-mono uppercase text-[10px] text-destructive mr-2">[{w.severity}]</span>
+                            <strong>{w.issue}</strong>
+                            {w.recommendation && <div className="text-muted-foreground mt-1">→ {w.recommendation}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {Array.isArray(run.verification_blueprint.json.corrections) && run.verification_blueprint.json.corrections.length > 0 && (
+                    <div>
+                      <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Korrekturen</h4>
+                      <ul className="space-y-1 text-xs">
+                        {run.verification_blueprint.json.corrections.map((c: any, i: number) => (
+                          <li key={i} className="p-2 rounded bg-muted/30 border border-border">
+                            <code className="text-accent">{c.parameter}</code>: <s className="text-muted-foreground">{c.current}</s> → <strong>{c.should_be}</strong>
+                            {c.rationale && <div className="text-muted-foreground mt-1">{c.rationale}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              {run.verification_blueprint.citations?.length > 0 && (
+                <div className="not-prose">
+                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Quellen</h4>
+                  <ul className="text-xs space-y-1">
+                    {run.verification_blueprint.citations.map((c: any, i: number) => (
+                      <li key={i}><a href={typeof c === "string" ? c : c?.url} target="_blank" rel="noreferrer" className="text-accent hover:underline break-all">{typeof c === "string" ? c : (c?.title ?? c?.url)}</a></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : <p className="text-sm text-muted-foreground p-4">Wartet auf Perplexity Logical Verification (sonar-reasoning-pro)…</p>}
         </TabsContent>
 
         <TabsContent value="validation" className="flex-1 overflow-auto px-4 pb-4 mt-0">
