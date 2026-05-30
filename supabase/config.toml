@@ -74,3 +74,12 @@ verify_jwt = false
 
 [functions.verify-analysis-image]
 verify_jwt = false
+
+[functions.picsart-concept-sketch]
+verify_jwt = false
+
+[functions.picsart-datasheet]
+verify_jwt = false
+
+[functions.picsart-enhance-upload]
+verify_jwt = false

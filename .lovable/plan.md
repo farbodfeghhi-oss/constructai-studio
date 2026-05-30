@@ -1,81 +1,134 @@
-## Ziel
-Nach Abschluss eines Analyse-Runs öffnet sich automatisch ein großes Ergebnis-Fenster (Modal/Dialog), das den finalen Engineering-Report **plus** eine Meta-Sidebar zeigt und folgende Aktionen anbietet:
 
-1. **Run-Metadaten** (AI-Rolle, Haupt-Prompt, Rechenzeit, Quellen, hochgeladene Dateien, verwendete Modelle pro Phase)
-2. **Picsart-Bildgenerierung** auf Basis des Ergebnisses (Technische Zeichnungen / Doku-Bilder)
-3. **Export** als **PDF**, **Word (.docx)** und **HTML**
+# Phase 6 — Picsart Visuals & Doc Render (Refactor)
 
-## Backend-Änderungen
+Ziel: Die aktuelle, generische `generate-analysis-image` / `generate-picsart-doc` Logik wird komplett ersetzt durch **drei spezialisierte Picsart-Pfade**, die jeweils das richtige Picsart-Produkt nutzen. Picsart wird damit zur echten Phase 6 nach `docgen`.
 
-### 1. DB-Migration (`analysis_runs`)
-Neue Spalten:
-- `started_at timestamptz` (gesetzt beim Übergang `queued → running`)
-- `completed_at timestamptz` (gesetzt beim Übergang auf `done`/`error`)
-- `models_used jsonb` (z.B. `{"design":"claude-opus-4.7", "verification":"sonar-reasoning-pro", ...}`)
-- `generated_images jsonb` (Array `{url, prompt, kind, created_at}`)
+---
 
-Backfill für laufende Runs nicht nötig.
+## 1. Architektur-Übersicht
 
-### 2. Orchestrator (`advanced-analysis-orchestrator`)
-- Setzt `started_at` beim ersten Phase-Wechsel und `completed_at` am Ende.
-- Schreibt nach jeder Phase `models_used.<phase> = <model_name>` (aus jeweiliger Agent-Response).
+```text
+Perplexity Pipeline (Phase 1-5)
+        │
+        ▼
+┌────────────────────────────────────────────────┐
+│ Phase 6: Picsart Visuals & Doc Render          │
+│                                                │
+│  6a) AI Hub – Konzept-Skizzen   (recraftv4)    │
+│      → genai/text2image                        │
+│                                                │
+│  6b) Variable Data Content API – Datenblätter  │
+│      → replay/apply-variables → PDF/PNG        │
+│                                                │
+│  6c) Programmable Image – CAD-Upload Aufwertung│
+│      → upscale/ultra  +  removebg v10          │
+└────────────────────────────────────────────────┘
+        │
+        ▼
+analysis_runs.generated_images  (typed entries)
+```
 
-### 3. Neue Edge Function `generate-analysis-image`
-- Input: `run_id`, `kind` ("technical_drawing" | "documentation"), `prompt_override?`
-- Liest `analysis_runs.final_report` + `design_blueprint`.
-- Baut Picsart-Prompt (technische Zeichnung, isometrisch, Bemaßung etc.).
-- Ruft Picsart API (`PICSART_API_KEY` ist bereits vorhanden, siehe `generate-picsart-doc`) → lädt Bild in Storage-Bucket `analysis-uploads/${user_id}/generated/`.
-- Hängt Eintrag an `analysis_runs.generated_images`.
+Ein gemeinsamer Pipeline-Eintrag mit `kind`:
+`concept_sketch` | `data_sheet` | `cad_enhanced`.
 
-### 4. Neue Edge Function `export-analysis-report`
-- Input: `run_id`, `format` ("pdf" | "docx" | "html")
-- HTML: server-rendertes Markdown → HTML mit eingebettetem CSS, inkl. Meta-Tabelle und Bilder.
-- PDF: HTML → PDF via Deno-kompatible Lib (`https://esm.sh/html-pdf-node` Fallback: PDFKit). Bevorzugt: einfache HTML-zu-PDF Route mit `pdf-lib` + minimaler Renderer; alternativ Browser-print im Frontend (siehe Fallback unten).
-- DOCX: `docx`-NPM Lib via esm.sh → Buffer.
-- Antwort: Base64-Blob oder Signed-URL (Upload nach `analysis-uploads/${user_id}/exports/`).
+---
 
-**Fallback (falls Deno-PDF schwierig):** Export rein clientseitig in den ersten Wurf:
-- HTML: Blob aus Markdown→HTML
-- PDF: `window.print()` über dedizierte Print-View
-- DOCX: `docx` NPM-Paket clientseitig
+## 2. Backend-Änderungen
 
-Für saubere Architektur und Konsistenz wähle ich die **Edge-Function-Variante** (`export-analysis-report`).
+### 2.1 `agent-docgen` erweitern (Phase 5 → Phase 6 Brücke)
+Im JSON-Schema von `agent-docgen` zwei neue Pflichtfelder ergänzen, **damit Picsart niemals den Volltext bekommt**:
 
-## Frontend-Änderungen
+- `picsart_image_prompt: string` — ein kurzer, isolierter Bildprompt (z.B. *"clean technical vector illustration of a sheet-metal cover, blueprint style, white background, no text"*)
+- `data_sheet_variables: Record<string,string>` — flache Key/Value-Map (Titel, Werkstoff, Norm, Toleranz, Maße, Stückzahl, …) für das Variable-Data-Template
 
-### 1. Neue Komponente `AnalysisResultDialog.tsx`
-- Vollbild-Dialog (`Dialog` aus shadcn, `max-w-[1400px]`).
-- Öffnet sich automatisch, wenn `run.status === "done"` (gesteuert über lokalen State + Effekt in `AdvancedEngineeringAnalysis.tsx`, mit "X" zum Schließen).
-- Layout: links Report (Markdown-Rendering), rechts Sidebar mit:
-  - **Run-Info**: Plan-Name, Plan-Key (AI-Rolle), Erstellt am, Dauer (`completed_at - started_at`)
-  - **Haupt-Prompt** (collapsible)
-  - **Modelle pro Phase** (aus `models_used`)
-  - **Quellen**: Citations aus Design / Verification / Standards / Docgen
-  - **Hochgeladene Dateien**: aus `file_paths` (Filename + Signed-URL via Edge oder direct)
-  - **RAG-Treffer**: Top-Knowledge-Items (aus `design_blueprint.rag_matches` falls vorhanden — sonst nur Anzahl Referenzen)
-- Aktionen-Toolbar oben rechts:
-  - Buttons: **Export PDF**, **Export Word**, **Export HTML** → ruft `export-analysis-report` und triggert Download.
-  - Button: **Bilder mit Picsart erzeugen** → öffnet Sub-Dialog mit Prompt-Vorschlag (technische Zeichnung / Doku-Bild), ruft `generate-analysis-image`, zeigt Galerie der generierten Bilder unten im Report.
+Diese Felder werden in `analysis_runs.docgen_blueprint` (oder unter `final_structured`) gespeichert und sind die einzige Quelle für Picsart.
 
-### 2. `AnalysisReportView.tsx`
-- Bleibt für die Inline-Vorschau im Hauptpanel.
-- Neuer Button "Vollbild-Ansicht" → öffnet `AnalysisResultDialog`.
+### 2.2 Neue Edge Function `picsart-concept-sketch` (ersetzt Teile von `generate-analysis-image`)
+- Endpunkt: `POST https://genai-api.picsart.io/v1/text2image`
+- Body (JSON): `{ model: "recraftv4", prompt: <picsart_image_prompt>, negative_prompt, width:1024, height:1024, count:1 }`
+- Fallback-Modell: `flux-2-pro` (über `?model=flux` Param vom Frontend wählbar).
+- Polling: `GET /v1/text2image/inferences/{id}` — Status-Whitelist **nur** `processing` | `success` | `error`. `processing` → weiter pollen, `success` → URL abholen, `error` → werfen.
+- Header: `X-Picsart-API-Key`, `Content-Type: application/json`, `Accept: application/json`.
+- Upload nach `analysis-uploads/${user_id}/generated/${run_id}/concept-*.png`, Eintrag `{kind:"concept_sketch", model, prompt, url, path}` an `generated_images` anhängen.
 
-### 3. `useAnalysisRun.ts`
-- Felder ergänzen: `started_at`, `completed_at`, `models_used`, `generated_images`.
+### 2.3 Neue Edge Function `picsart-datasheet` (Variable Data Content API)
+- Verwendet ein in Picsart Studio vorbereitetes **Replay-Template** (Template-ID als Secret `PICSART_DATASHEET_TEMPLATE_ID`).
+- Schritt A: `POST /v1/replay/apply-variables` mit `{ template_id, variables: data_sheet_variables }` → liefert `replay_id`.
+- Schritt B: Export entweder
+  - `POST /v1/replay/export` (PNG/JPG) **oder**
+  - `POST /v1/replay2pdf` (PDF) — vom Frontend `format: "png" | "pdf"` gewählt.
+- Polling identisch (`processing|success|error`).
+- Ergebnis-Datei wird nach `analysis-uploads/${user_id}/generated/${run_id}/datasheet-*.{png|pdf}` gelegt, Eintrag `{kind:"data_sheet", template_id, variables, format, url, path}`.
+- **Vorteil:** Texte (Toleranzen, Werkstoffe) werden gerendert, nicht halluziniert.
 
-### 4. `AdvancedEngineeringAnalysis.tsx`
-- Auto-Open-Effekt: wenn Run von `running` → `done` wechselt und Dialog noch nie für diesen Run geöffnet war.
+### 2.4 Neue Edge Function `picsart-enhance-upload` (Programmable Image API)
+Input: `run_id`, `source_path` (eines der in Phase 1 hochgeladenen Bilder), `options: { upscale: true, remove_bg: true, shadow: true }`.
 
-## Out of Scope
-- Keine Änderungen an Pipeline-Logik (aggregator/design/verification/standards/docgen).
-- Keine Mehrsprachigkeit der Exports (Deutsch wie der Report).
-- Keine Bearbeitung des Reports vor Export (read-only).
-- Picsart-Bildgenerierung erzeugt einzelne Bilder on-demand, keine automatische Vollserie.
+Pipeline (sequenziell, alles JSON außer der Erst-Upload):
+1. **Ultra Upscale** — `POST /tools/v1/upscale/ultra` (async) → poll → upscaled URL.
+2. **Remove Background v10** — `POST /tools/v1/removebg` mit `{ image_url, model: "v10", output_type: "cutout" }`.
+3. Optional **Shadow for Remove Background** — `POST /tools/v1/removebg/shadow` für realistischen Schlagschatten.
 
-## Reihenfolge der Implementierung
-1. DB-Migration (`started_at`, `completed_at`, `models_used`, `generated_images`)
-2. Orchestrator-Patch (Timestamps + models_used)
-3. Edge Function `generate-analysis-image`
-4. Edge Function `export-analysis-report`
-5. Frontend: Hook + Dialog + Auto-Open + Buttons
+Status-Handling: ausschließlich `processing|success|error`. Authentifizierung via `X-Picsart-API-Key`. Bevorzugt `application/json` Bodys; nur bei initialem Binär-Upload `multipart/form-data`.
+Speicherung als `cad_enhanced` mit `source_path` Referenz.
+
+### 2.5 Orchestrator-Anbindung
+- `advanced-analysis-orchestrator` bekommt **keine automatische** Phase-6-Ausführung (bleibt on-demand vom User), aber:
+  - Setzt nach `docgen` einen neuen Status `awaiting_visuals`.
+  - `models_used.picsart_concept = "recraftv4"`, `models_used.picsart_datasheet = "replay-template:<id>"`, `models_used.picsart_enhance = "upscale-ultra+removebg-v10"` werden bei jedem Sub-Call geschrieben.
+
+### 2.6 Cleanup
+- Alte `generate-analysis-image` Funktion → in `picsart-concept-sketch` umbenennen/ersetzen (Routen bleiben kompatibel über Wrapper, der intern auf den neuen Pfad ruft, damit Frontend-Calls nicht brechen).
+- `generate-picsart-doc` (alt, hartcodierte deutsche Prompts) → deprecated, ersetzt durch `picsart-datasheet`.
+- `verify-analysis-image` bleibt unverändert und wird automatisch auch auf `concept_sketch` Ergebnisse anwendbar.
+
+### 2.7 `config.toml`
+Drei neue Function-Einträge mit `verify_jwt = false`:
+```
+[functions.picsart-concept-sketch]
+[functions.picsart-datasheet]
+[functions.picsart-enhance-upload]
+```
+
+### 2.8 Secrets
+- `PICSART_API_KEY` (vorhanden)
+- **Neu nötig:** `PICSART_DATASHEET_TEMPLATE_ID` — wird via `add_secret` angefordert, sobald das Template in Picsart Studio existiert.
+
+---
+
+## 3. Frontend-Änderungen (`AnalysisResultDialog.tsx`)
+
+Die bestehende "Picsart"-Tab-Sektion wird in **drei Sub-Tabs** umgebaut:
+
+1. **Konzept-Skizze** — Button "Skizze erzeugen" (`recraftv4`) + Modell-Toggle (`recraftv4` / `flux-2-pro`). Zeigt `picsart_image_prompt` aus docgen als read-only Preview vor Submit.
+2. **Datenblatt rendern** — Tabelle aller `data_sheet_variables` (editierbar), Format-Switch **PNG / PDF**, Button "Datenblatt rendern". Download-Link nach Erfolg.
+3. **CAD-Bild aufwerten** — Liste der `file_paths` aus dem Run, je Datei Checkboxen *Upscale*, *Remove BG*, *Shadow*, Button "Aufwerten".
+
+Galerie unten gruppiert nach `kind` mit Badge (Konzept / Datenblatt / CAD-Enhanced). Bestehender Verify-Button bleibt pro Bild verfügbar.
+
+---
+
+## 4. Reihenfolge der Implementierung
+
+1. `agent-docgen` JSON-Schema erweitern (`picsart_image_prompt`, `data_sheet_variables`)
+2. Secret `PICSART_DATASHEET_TEMPLATE_ID` anfragen
+3. Edge Function `picsart-concept-sketch`
+4. Edge Function `picsart-datasheet`
+5. Edge Function `picsart-enhance-upload`
+6. `config.toml` aktualisieren
+7. Frontend: Sub-Tabs + neue Hooks/Calls in `AnalysisResultDialog`
+8. Alte `generate-picsart-doc` / `generate-analysis-image` deprecaten
+
+---
+
+## 5. Out of Scope
+- Kein automatisches Triggern von Phase 6 nach `docgen` (bleibt user-initiiert).
+- Kein Editor für Picsart-Templates im Frontend (Template wird in Picsart Studio gepflegt).
+- Keine Änderungen an Phasen 1–5 außer dem `agent-docgen`-Schema-Patch.
+
+---
+
+## Offene Bestätigung
+1. Du legst das Replay-Template in Picsart Studio an und gibst mir die Template-ID (ich frage sie via Secret-Tool ab) — OK?
+2. Default-Modell für Konzept-Skizzen = `recraftv4`, `flux-2-pro` als Toggle — OK?
+3. Datenblatt-Export-Default = **PDF** (über `replay2pdf`), PNG als Option — OK?
