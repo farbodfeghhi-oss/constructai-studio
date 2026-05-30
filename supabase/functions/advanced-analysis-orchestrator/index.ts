@@ -289,6 +289,15 @@ const FINAL_REPORT_SCHEMA = {
         implementation_plan: { type: "string" },
         risks_and_conformity: { type: "string" },
         sources: { type: "array", items: { type: "string" } },
+        // Phase 6 bridge — short isolated prompt for Picsart AI Hub (recraftv4/flux-2-pro).
+        // MUST NOT contain the full report. Max ~300 chars, English, blueprint/vector style.
+        picsart_image_prompt: { type: "string" },
+        // Flat key/value map for Picsart Variable Data Content (Replay) template.
+        // Keys map to template variables (title, material, standard, tolerance, dimensions, qty…).
+        data_sheet_variables: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
       },
       required: [
         "executive_summary",
@@ -296,6 +305,8 @@ const FINAL_REPORT_SCHEMA = {
         "optimizations",
         "implementation_plan",
         "risks_and_conformity",
+        "picsart_image_prompt",
+        "data_sheet_variables",
       ],
     },
   },
@@ -347,7 +358,9 @@ async function docgenPhase(ctx: Aggregated, design: any, verification: any, stan
   ];
   const uniqueSources = Array.from(new Set(allCitations.map((c: any) => (typeof c === "string" ? c : c?.url ?? "")))).filter(Boolean);
 
-  return reportToMarkdown(data?.structured ?? {}, uniqueSources) || (data?.content ?? "");
+  const structured = data?.structured ?? null;
+  const report = reportToMarkdown(structured ?? {}, uniqueSources) || (data?.content ?? "");
+  return { report, structured };
 }
 
 Deno.serve(async (req) => {
@@ -398,8 +411,8 @@ Deno.serve(async (req) => {
           } else if (phase === "docgen") {
             if (!aggregated) aggregated = await aggregator(run_id);
             if (!design || !verification || !standards) throw new Error("Missing prior phases");
-            const report = await withRetry(() => docgenPhase(aggregated!, design, verification, standards));
-            await updateRun(run_id, { final_report: report });
+            const { report, structured } = await withRetry(() => docgenPhase(aggregated!, design, verification, standards));
+            await updateRun(run_id, { final_report: report, docgen_blueprint: structured });
             await recordModel(run_id, "docgen", "sonar-pro");
           }
           await setPhase(run_id, phase, "done");
