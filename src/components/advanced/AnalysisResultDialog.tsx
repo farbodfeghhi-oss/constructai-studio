@@ -20,14 +20,19 @@ import {
 } from "docx";
 import jsPDF from "jspdf";
 
-type ImageKind = "technical_drawing" | "documentation" | "isometric_render" | "exploded_view";
+// Phase-6 image kinds
+type ImageKind = "concept_sketch" | "data_sheet" | "cad_enhanced"
+  | "technical_drawing" | "documentation" | "isometric_render" | "exploded_view";
 
-const KIND_OPTIONS: { value: ImageKind; label: string; hint: string }[] = [
-  { value: "technical_drawing", label: "Technische Zeichnung", hint: "DIN/ISO Orthographic Views" },
-  { value: "isometric_render", label: "Isometrische Darstellung", hint: "3D Produkt-Render" },
-  { value: "exploded_view", label: "Explosionszeichnung", hint: "Nummerierte Callouts" },
-  { value: "documentation", label: "Doku-Illustration", hint: "Anleitungs-Bild" },
-];
+const KIND_BADGE: Record<string, string> = {
+  concept_sketch: "Konzept",
+  data_sheet: "Datenblatt",
+  cad_enhanced: "CAD-Enhanced",
+  technical_drawing: "Tech. Zeichnung",
+  documentation: "Doku",
+  isometric_render: "Iso-Render",
+  exploded_view: "Explosion",
+};
 
 function formatDuration(startIso?: string | null, endIso?: string | null) {
   if (!startIso || !endIso) return "—";
@@ -56,9 +61,13 @@ function collectAllCitations(run: AnalysisRun): string[] {
 export function AnalysisResultDialog({
   run, open, onOpenChange,
 }: { run: AnalysisRun | null; open: boolean; onOpenChange: (b: boolean) => void }) {
-  const [generating, setGenerating] = useState<ImageKind | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [verifyingIdx, setVerifyingIdx] = useState<number | null>(null);
   const [exporting, setExporting] = useState<"pdf" | "docx" | "html" | null>(null);
+  const [conceptModel, setConceptModel] = useState<"recraftv4" | "flux-2-pro">("recraftv4");
+  const [dsFormat, setDsFormat] = useState<"pdf" | "png">("pdf");
+  const [dsVars, setDsVars] = useState<Record<string, string> | null>(null);
+  const [enhanceOpts, setEnhanceOpts] = useState<{ upscale: boolean; remove_bg: boolean; shadow: boolean }>({ upscale: true, remove_bg: true, shadow: false });
 
   const allCitations = useMemo(() => (run ? collectAllCitations(run) : []), [run]);
   const duration = formatDuration(run?.started_at ?? run?.created_at, run?.completed_at);
