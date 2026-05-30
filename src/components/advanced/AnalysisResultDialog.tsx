@@ -325,73 +325,175 @@ ${sources}
                     <p className="text-sm text-muted-foreground">Kein Report vorhanden.</p>
                   )}
                 </TabsContent>
-                <TabsContent value="images" className="mt-4">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {KIND_OPTIONS.map((opt) => (
-                      <Button key={opt.value} size="sm" variant="outline" disabled={!!generating}
-                        onClick={() => generateImage(opt.value)}>
-                        {generating === opt.value
-                          ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                          : <ImageIcon className="h-3.5 w-3.5 mr-1.5" />}
-                        {opt.label}
-                      </Button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mb-4">
-                    Bilder werden von Picsart auf Basis des Reports generiert (1024×1024, ~30–60 s).
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(run.generated_images ?? []).map((img: any, i) => {
-                      const v = img.verification;
-                      const isRevision = typeof img.revised_from === "number";
-                      return (
-                        <figure key={i} className="rounded-md border border-border overflow-hidden bg-card flex flex-col">
-                          <img src={img.url} alt={img.label ?? img.kind} className="w-full h-auto" />
-                          <figcaption className="p-2 text-xs space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-medium truncate">{img.label ?? img.kind}</span>
-                              <a href={img.url} target="_blank" rel="noreferrer" className="text-accent hover:underline shrink-0">
-                                <Download className="h-3 w-3 inline" />
-                              </a>
-                            </div>
-                            {isRevision && (
-                              <Badge variant="secondary" className="text-[10px]">Revision von Bild #{(img.revised_from as number) + 1}</Badge>
-                            )}
-                            {v && (
-                              <div className={`flex items-start gap-1.5 rounded px-2 py-1.5 text-[11px] ${v.verdict === "ok" ? "bg-green-500/10 text-green-300" : "bg-amber-500/10 text-amber-300"}`}>
-                                {v.verdict === "ok"
-                                  ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                                  : <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
-                                <div className="space-y-0.5">
-                                  <div className="font-semibold">{v.verdict === "ok" ? "Geprüft & OK" : "Korrektur empfohlen"}</div>
-                                  {v.notes && <div className="opacity-90">{v.notes}</div>}
-                                  {Array.isArray(v.issues) && v.issues.length > 0 && (
-                                    <ul className="list-disc list-inside opacity-80">
-                                      {v.issues.slice(0, 3).map((it: string, j: number) => <li key={j}>{it}</li>)}
-                                    </ul>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full h-7 text-[11px]"
-                              disabled={verifyingIdx !== null}
-                              onClick={() => verifyImage(i)}
-                            >
-                              {verifyingIdx === i
+                <TabsContent value="images" className="mt-4 space-y-6">
+                  <Tabs defaultValue="concept">
+                    <TabsList>
+                      <TabsTrigger value="concept">Konzept-Skizze</TabsTrigger>
+                      <TabsTrigger value="datasheet">Datenblatt</TabsTrigger>
+                      <TabsTrigger value="enhance">CAD-Bild aufwerten</TabsTrigger>
+                    </TabsList>
+
+                    {/* 6a — Konzept-Skizze (AI Hub recraftv4/flux-2-pro) */}
+                    <TabsContent value="concept" className="mt-4 space-y-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">Modell:</span>
+                        {(["recraftv4", "flux-2-pro"] as const).map((m) => (
+                          <Button key={m} size="sm" variant={conceptModel === m ? "default" : "outline"}
+                            className="h-7 text-[11px]" onClick={() => setConceptModel(m)}>{m}</Button>
+                        ))}
+                        <Button size="sm" className="ml-auto" disabled={!!busy || !picsartPrompt} onClick={genConcept}>
+                          {busy === `concept:${conceptModel}`
+                            ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+                          Skizze erzeugen
+                        </Button>
+                      </div>
+                      <div>
+                        <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Isolierter Prompt (aus docgen)</div>
+                        <pre className="text-[11px] p-2 rounded bg-muted/40 whitespace-pre-wrap break-words leading-relaxed border border-border">
+                          {picsartPrompt || "— noch nicht vorhanden. Bitte docgen-Phase abschließen."}
+                        </pre>
+                      </div>
+                    </TabsContent>
+
+                    {/* 6b — Datenblatt (Variable Data Content API) */}
+                    <TabsContent value="datasheet" className="mt-4 space-y-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">Format:</span>
+                        {(["pdf", "png"] as const).map((f) => (
+                          <Button key={f} size="sm" variant={dsFormat === f ? "default" : "outline"}
+                            className="h-7 text-[11px] uppercase" onClick={() => setDsFormat(f)}>{f}</Button>
+                        ))}
+                        <Button size="sm" className="ml-auto" disabled={!!busy || Object.keys(effectiveDsVars).length === 0} onClick={genDatasheet}>
+                          {busy === `ds:${dsFormat}`
+                            ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            : <FileType2 className="h-3.5 w-3.5 mr-1.5" />}
+                          Datenblatt rendern
+                        </Button>
+                      </div>
+                      {Object.keys(effectiveDsVars).length === 0 ? (
+                        <p className="text-xs text-muted-foreground">Keine Datenblatt-Variablen vorhanden. Bitte docgen-Phase abschließen.</p>
+                      ) : (
+                        <div className="border border-border rounded overflow-hidden">
+                          <table className="w-full text-xs">
+                            <tbody>
+                              {Object.entries(effectiveDsVars).map(([k, v]) => (
+                                <tr key={k} className="border-b border-border/60 last:border-0">
+                                  <td className="p-2 font-mono text-muted-foreground w-[180px] align-top">{k}</td>
+                                  <td className="p-1">
+                                    <input
+                                      className="w-full bg-transparent px-1 py-1 rounded border border-transparent focus:border-accent outline-none"
+                                      value={v}
+                                      onChange={(e) => setDsVars({ ...effectiveDsVars, [k]: e.target.value })}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    {/* 6c — CAD-Bild aufwerten (Programmable Image API) */}
+                    <TabsContent value="enhance" className="mt-4 space-y-3">
+                      <div className="flex items-center gap-3 flex-wrap text-xs">
+                        {(["upscale", "remove_bg", "shadow"] as const).map((k) => (
+                          <label key={k} className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" checked={enhanceOpts[k]}
+                              onChange={(e) => setEnhanceOpts({ ...enhanceOpts, [k]: e.target.checked })} />
+                            {k === "upscale" ? "Ultra Upscale" : k === "remove_bg" ? "Remove BG v10" : "Shadow"}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="space-y-1">
+                        {(run.file_paths ?? []).length === 0 && (
+                          <p className="text-xs text-muted-foreground">Keine hochgeladenen Dateien in diesem Run.</p>
+                        )}
+                        {(run.file_paths ?? []).map((p) => (
+                          <div key={p} className="flex items-center justify-between gap-2 p-2 rounded border border-border bg-card/40">
+                            <span className="font-mono text-[11px] break-all">{p.split("/").pop()}</span>
+                            <Button size="sm" variant="outline" className="h-7 text-[11px] shrink-0"
+                              disabled={!!busy} onClick={() => genEnhance(p)}>
+                              {busy === `enh:${p}`
                                 ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                                : <ShieldCheck className="h-3 w-3 mr-1.5" />}
-                              {v ? "Erneut prüfen & verbessern" : "Technische Prüfung & Auto-Verbesserung"}
+                                : <Sparkles className="h-3 w-3 mr-1.5" />}
+                              Aufwerten
                             </Button>
-                          </figcaption>
-                        </figure>
-                      );
-                    })}
-                    {(run.generated_images ?? []).length === 0 && (
-                      <p className="text-sm text-muted-foreground col-span-full">Noch keine Bilder generiert.</p>
-                    )}
+                          </div>
+                        ))}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+
+                  {/* Gallery */}
+                  <div>
+                    <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">
+                      Galerie ({(run.generated_images ?? []).length})
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(run.generated_images ?? []).map((img: any, i) => {
+                        const v = img.verification;
+                        const isRevision = typeof img.revised_from === "number";
+                        const isPdf = img.mime === "application/pdf" || img.format === "pdf";
+                        return (
+                          <figure key={i} className="rounded-md border border-border overflow-hidden bg-card flex flex-col">
+                            {isPdf ? (
+                              <div className="w-full h-48 flex flex-col items-center justify-center bg-muted/40 text-muted-foreground gap-2">
+                                <FileText className="h-10 w-10" />
+                                <a href={img.url} target="_blank" rel="noreferrer" className="text-xs text-accent underline">PDF öffnen</a>
+                              </div>
+                            ) : (
+                              <img src={img.url} alt={img.label ?? img.kind} className="w-full h-auto" />
+                            )}
+                            <figcaption className="p-2 text-xs space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Badge variant="secondary" className="text-[10px] shrink-0">{KIND_BADGE[img.kind] ?? img.kind}</Badge>
+                                  <span className="font-medium truncate">{img.label ?? img.kind}</span>
+                                </div>
+                                <a href={img.url} target="_blank" rel="noreferrer" className="text-accent hover:underline shrink-0">
+                                  <Download className="h-3 w-3 inline" />
+                                </a>
+                              </div>
+                              {isRevision && (
+                                <Badge variant="secondary" className="text-[10px]">Revision von Bild #{(img.revised_from as number) + 1}</Badge>
+                              )}
+                              {v && (
+                                <div className={`flex items-start gap-1.5 rounded px-2 py-1.5 text-[11px] ${v.verdict === "ok" ? "bg-green-500/10 text-green-300" : "bg-amber-500/10 text-amber-300"}`}>
+                                  {v.verdict === "ok"
+                                    ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                    : <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
+                                  <div className="space-y-0.5">
+                                    <div className="font-semibold">{v.verdict === "ok" ? "Geprüft & OK" : "Korrektur empfohlen"}</div>
+                                    {v.notes && <div className="opacity-90">{v.notes}</div>}
+                                    {Array.isArray(v.issues) && v.issues.length > 0 && (
+                                      <ul className="list-disc list-inside opacity-80">
+                                        {v.issues.slice(0, 3).map((it: string, j: number) => <li key={j}>{it}</li>)}
+                                      </ul>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              {!isPdf && (
+                                <Button
+                                  size="sm" variant="outline" className="w-full h-7 text-[11px]"
+                                  disabled={verifyingIdx !== null} onClick={() => verifyImage(i)}
+                                >
+                                  {verifyingIdx === i
+                                    ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                    : <ShieldCheck className="h-3 w-3 mr-1.5" />}
+                                  {v ? "Erneut prüfen & verbessern" : "Technische Prüfung & Auto-Verbesserung"}
+                                </Button>
+                              )}
+                            </figcaption>
+                          </figure>
+                        );
+                      })}
+                      {(run.generated_images ?? []).length === 0 && (
+                        <p className="text-sm text-muted-foreground col-span-full">Noch keine Bilder generiert.</p>
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
