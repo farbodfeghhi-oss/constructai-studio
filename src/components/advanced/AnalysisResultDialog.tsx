@@ -231,20 +231,32 @@ ${sources}
     } finally { setExporting(null); }
   };
 
-  // ---------- Picsart ----------
-  const generateImage = async (kind: ImageKind) => {
-    setGenerating(kind);
+  // ---------- Picsart Phase 6 ----------
+  const dgStructured: any = (run.docgen_blueprint as any) ?? {};
+  const picsartPrompt: string = dgStructured?.picsart_image_prompt ?? "";
+  const initialDsVars: Record<string, string> = dgStructured?.data_sheet_variables ?? {};
+  const effectiveDsVars = dsVars ?? initialDsVars;
+
+  const invokePicsart = async (fn: string, body: Record<string, unknown>, busyKey: string, okMsg: string) => {
+    setBusy(busyKey);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-analysis-image", {
-        body: { run_id: run.id, kind },
-      });
+      const { data, error } = await supabase.functions.invoke(fn, { body: { run_id: run.id, ...body } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast({ title: "Bild generiert", description: KIND_OPTIONS.find((o) => o.value === kind)?.label });
+      toast({ title: okMsg });
     } catch (e: any) {
-      toast({ title: "Bildgenerierung fehlgeschlagen", description: e?.message ?? String(e), variant: "destructive" });
-    } finally { setGenerating(null); }
+      toast({ title: `${fn} fehlgeschlagen`, description: e?.message ?? String(e), variant: "destructive" });
+    } finally { setBusy(null); }
   };
+
+  const genConcept = () => invokePicsart("picsart-concept-sketch",
+    { model: conceptModel }, `concept:${conceptModel}`, "Konzept-Skizze erstellt");
+
+  const genDatasheet = () => invokePicsart("picsart-datasheet",
+    { format: dsFormat, variables_override: effectiveDsVars }, `ds:${dsFormat}`, `Datenblatt (${dsFormat.toUpperCase()}) gerendert`);
+
+  const genEnhance = (source_path: string) => invokePicsart("picsart-enhance-upload",
+    { source_path, options: enhanceOpts }, `enh:${source_path}`, "CAD-Bild aufgewertet");
 
   const verifyImage = async (index: number) => {
     setVerifyingIdx(index);
