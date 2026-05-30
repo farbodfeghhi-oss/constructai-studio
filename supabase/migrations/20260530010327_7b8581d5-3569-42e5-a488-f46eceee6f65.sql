@@ -1,0 +1,1 @@
+ALTER TABLE public.analysis_runs ADD COLUMN IF NOT EXISTS docgen_blueprint jsonb;

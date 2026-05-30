@@ -86,6 +86,7 @@ export type Database = {
           created_at: string
           current_phase: string
           design_blueprint: Json | null
+          docgen_blueprint: Json | null
           error: string | null
           file_paths: string[]
           final_report: string | null
@@ -111,6 +112,7 @@ export type Database = {
           created_at?: string
           current_phase?: string
           design_blueprint?: Json | null
+          docgen_blueprint?: Json | null
           error?: string | null
           file_paths?: string[]
           final_report?: string | null
@@ -136,6 +138,7 @@ export type Database = {
           created_at?: string
           current_phase?: string
           design_blueprint?: Json | null
+          docgen_blueprint?: Json | null
           error?: string | null
           file_paths?: string[]
           final_report?: string | null
