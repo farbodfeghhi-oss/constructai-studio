@@ -341,7 +341,7 @@ async function docgenPhase(ctx: Aggregated, design: any, verification: any, stan
     body: JSON.stringify({
       plan_key: "tech_docgen_structured",
       prompt:
-        "Synthetisiere den finalen Engineering Report aus Design-Blueprint (Schritt 2), Mathematischer Verifizierung (Schritt 3) und Normen-Validierung (Schritt 4). Antworte ausschließlich gemäß JSON-Schema. Verwende Markdown nur innerhalb der einzelnen string-Felder.",
+        "Synthetisiere den finalen Engineering Report aus Design-Blueprint (Schritt 2), Mathematischer Verifizierung (Schritt 3) und Normen-Validierung (Schritt 4). Antworte ausschließlich gemäß JSON-Schema. Verwende Markdown nur innerhalb der einzelnen string-Felder.\n\nZUSÄTZLICH PFLICHT (Phase 6 Brücke):\n- `picsart_image_prompt`: Ein einziger isolierter ENGLISCHER Prompt (<=300 Zeichen) für Picsart AI Hub (Modell recraftv4). Stil: clean technical vector illustration, blueprint style, white background, no text. Beschreibe NUR das Bauteil/die Baugruppe, NICHT den ganzen Report.\n- `data_sheet_variables`: Flache key/value Map (alle Werte als string) für ein Picsart Replay-Datenblatt-Template. Pflicht-Keys mindestens: title, material, standard, tolerance, dimensions, quantity, supplier, price. Werte rein aus dem verifizierten Report; keine Halluzinationen — fehlende Werte als '—' setzen.",
       context,
       override_schema: FINAL_REPORT_SCHEMA,
     }),

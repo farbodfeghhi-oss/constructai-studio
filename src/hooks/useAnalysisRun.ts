@@ -15,6 +15,7 @@ export interface AnalysisRun {
   phase_status: Record<PhaseKey, PhaseState>;
   design_blueprint: any;
   verification_blueprint: any;
+  docgen_blueprint: any;
   standards_validation: any;
   final_report: string | null;
   error: string | null;
